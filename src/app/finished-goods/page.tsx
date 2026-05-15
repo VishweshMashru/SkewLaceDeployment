@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, QrCode, X, Printer, ExternalLink, Layers } from "lucide-react";
 import Link from "next/link";
-import QRDisplay from "@/components/QRDisplay";
+import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import type { Product } from "@/db/schema";
 
 const schema = z.object({
@@ -22,19 +22,19 @@ type FormData = {
 
 const statusColors: Record<string, string> = {
   available: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  packed: "bg-amber-50 text-amber-700 border-amber-200",
-  dispatched: "bg-blue-50 text-blue-700 border-blue-200",
+  packed:    "bg-amber-50 text-amber-700 border-amber-200",
+  dispatched:"bg-blue-50 text-blue-700 border-blue-200",
 };
 
 export default function FinishedGoodsPage() {
-  const [items, setItems] = useState<any[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems]         = useState<any[]>([]);
+  const [products, setProducts]   = useState<Product[]>([]);
+  const [showForm, setShowForm]   = useState(false);
+  const [loading, setLoading]     = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [newItem, setNewItem] = useState<any>(null);
-  const [error, setError] = useState("");
-  const printRef = useRef<HTMLDivElement>(null);
+  const [newItem, setNewItem]     = useState<any>(null);
+  const [error, setError]         = useState("");
+  const qrRef = useRef<QRDisplayHandle>(null);
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -42,6 +42,7 @@ export default function FinishedGoodsPage() {
   });
 
   const trackingType = watch("trackingType");
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   async function fetchData() {
     const [fgRes, pRes] = await Promise.all([
@@ -56,59 +57,57 @@ export default function FinishedGoodsPage() {
   useEffect(() => { fetchData(); }, []);
 
   async function onSubmit(data: FormData) {
-    setSubmitting(true);
-    setError("");
+    setSubmitting(true); setError("");
     try {
       const qty =
         data.trackingType === "piece" ? 1
         : data.trackingType === "dozen" ? 12
         : parseInt(data.quantity || "0", 10);
       if (data.trackingType === "manual" && (!qty || qty < 1)) {
-        setError("Enter a valid quantity");
-        setSubmitting(false);
-        return;
+        setError("Enter a valid quantity"); setSubmitting(false); return;
       }
       const res = await fetch("/api/finished-goods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, quantity: qty }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed");
-      }
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
       const created = await res.json();
       setNewItem(created);
       reset();
       fetchData();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (e: any) { setError(e.message); }
+    finally { setSubmitting(false); }
   }
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-
   function handlePrint() {
-    const printContent = printRef.current;
-    if (!printContent) return;
+    if (!newItem) return;
+    const dataUrl = qrRef.current?.getDataUrl();
+    const { product } = newItem;
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`
-      <html><head><title>Print Label</title>
-      <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .label { border: 2px solid #1d4ed8; border-radius: 12px; padding: 16px; display: inline-block; text-align: center; max-width: 240px; }
-        .title { font-size: 14px; font-weight: bold; color: #1e3a5f; margin-bottom: 4px; }
-        .qty { font-size: 20px; font-weight: 900; color: #1d4ed8; margin: 4px 0; }
-        .sub { font-size: 11px; color: #64748b; }
-        .id { font-size: 9px; color: #94a3b8; margin-top: 8px; font-family: monospace; }
-      </style></head><body>
-      ${printContent.innerHTML}
-      <script>window.onload = () => { window.print(); window.close(); }</script>
-      </body></html>
-    `);
+    win.document.write(`<!DOCTYPE html><html><head><title>Label — ${newItem.id}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .label { border:2px solid #1d4ed8; border-radius:12px; padding:18px 20px; width:220px; text-align:center; }
+  .name  { font-size:15px; font-weight:700; color:#1e3a5f; margin-bottom:2px; }
+  .design{ font-size:11px; color:#64748b; margin-bottom:10px; }
+  .qr    { width:160px; height:160px; margin:0 auto 10px; display:block; }
+  .qty   { font-size:26px; font-weight:900; color:#1d4ed8; margin-bottom:2px; }
+  .pcs   { font-size:11px; color:#94a3b8; margin-bottom:6px; }
+  .id    { font-size:9px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+</style></head><body>
+<div class="label">
+  <div class="name">${product?.name ?? ""}</div>
+  ${product?.designNumber ? `<div class="design">Design ${product.designNumber}</div>` : `<div class="design">${product?.sku ?? ""}</div>`}
+  ${dataUrl ? `<img class="qr" src="${dataUrl}" />` : ""}
+  <div class="qty">${newItem.quantity}</div>
+  <div class="pcs">pieces</div>
+  <div class="id">${newItem.id}</div>
+</div>
+<script>window.onload = () => { window.print(); window.close(); }</script>
+</body></html>`);
     win.document.close();
   }
 
@@ -117,10 +116,8 @@ export default function FinishedGoodsPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-slate-800">Finished Goods Labels</h1>
         <div className="flex items-center gap-2">
-          <Link
-            href="/finished-goods/bulk"
-            className="flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
-          >
+          <Link href="/finished-goods/bulk"
+            className="flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">
             <Layers size={15} />
             <span className="hidden sm:inline">Bulk Print</span>
           </Link>
@@ -140,10 +137,8 @@ export default function FinishedGoodsPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Product *</label>
-              <select
-                {...register("productId")}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-              >
+              <select {...register("productId")}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
                 <option value="">Select product...</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
@@ -173,23 +168,14 @@ export default function FinishedGoodsPage() {
             {trackingType === "manual" && (
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Quantity *</label>
-                <input
-                  type="number"
-                  {...register("quantity")}
-                  placeholder="Enter quantity"
-                  min={1}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity.message}</p>}
+                <input type="number" {...register("quantity")} placeholder="Enter quantity" min={1}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
               </div>
             )}
 
             {error && <p className="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors"
-            >
+            <button type="submit" disabled={submitting}
+              className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
               {submitting ? "Generating..." : "Generate QR Label"}
             </button>
           </form>
@@ -201,36 +187,27 @@ export default function FinishedGoodsPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-emerald-700">✓ Label Created!</h2>
             <div className="flex gap-2">
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <Printer size={14} />
-                Print
+              <button onClick={handlePrint}
+                className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+                <Printer size={14} /> Print
               </button>
-              <Link
-                href={`/finished-goods/${newItem.id}`}
-                className="flex items-center gap-1.5 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <ExternalLink size={14} />
-                View
+              <Link href={`/finished-goods/${newItem.id}`}
+                className="flex items-center gap-1.5 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                <ExternalLink size={14} /> View
               </Link>
             </div>
           </div>
-
-          <div ref={printRef}>
-            <div className="label flex flex-col items-center gap-3">
-              <div className="text-center">
-                <p className="font-bold text-slate-800 text-sm">{newItem.product?.name}</p>
-                {newItem.product?.designNumber && (
-                  <p className="text-xs text-slate-500">Design {newItem.product.designNumber}</p>
-                )}
-              </div>
-              <QRDisplay value={`${baseUrl}/finished-goods/${newItem.id}`} size={160} />
-              <div className="text-center">
-                <p className="text-2xl font-black text-blue-600">{newItem.quantity} pcs</p>
-                <p className="text-xs text-slate-500 font-mono mt-1">{newItem.id}</p>
-              </div>
+          <div className="flex flex-col items-center gap-3">
+            <div className="text-center">
+              <p className="font-bold text-slate-800 text-sm">{newItem.product?.name}</p>
+              {newItem.product?.designNumber && (
+                <p className="text-xs text-slate-500">Design {newItem.product.designNumber}</p>
+              )}
+            </div>
+            <QRDisplay ref={qrRef} value={`${baseUrl}/finished-goods/${newItem.id}`} size={160} />
+            <div className="text-center">
+              <p className="text-2xl font-black text-blue-600">{newItem.quantity} pcs</p>
+              <p className="text-xs text-slate-500 font-mono mt-1">{newItem.id}</p>
             </div>
           </div>
         </div>
@@ -247,11 +224,8 @@ export default function FinishedGoodsPage() {
         <div className="space-y-3">
           <h2 className="font-semibold text-slate-600 text-sm uppercase tracking-wide px-1">All Labels</h2>
           {items.map((item: any) => (
-            <Link
-              key={item.fg.id}
-              href={`/finished-goods/${item.fg.id}`}
-              className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3 hover:shadow-sm transition-all active:scale-[0.99] block"
-            >
+            <Link key={item.fg.id} href={`/finished-goods/${item.fg.id}`}
+              className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3 hover:shadow-sm transition-all active:scale-[0.99] block">
               <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
                 <QrCode size={18} className="text-emerald-600" />
               </div>
