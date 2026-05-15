@@ -14,10 +14,13 @@ const createProductSchema = z.object({
 
 export async function GET() {
   try {
+    console.log("DATABASE_URL present:", !!process.env.DATABASE_URL);
+    console.log("DATABASE_URL prefix:", process.env.DATABASE_URL?.slice(0, 30));
     const all = await db.select().from(products).orderBy(desc(products.createdAt));
     return NextResponse.json(all);
   } catch (e) {
-    return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
+    console.error("GET /api/products error:", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
 
@@ -33,10 +36,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(product, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation error' }, { status: 400 });
+      return NextResponse.json({ error: "Validation error" }, { status: 400 });
     }
-    return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
+    console.error("POST /api/products error:", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
