@@ -10,6 +10,7 @@ const createProductSchema = z.object({
   sku: z.string().min(1),
   designNumber: z.string().optional(),
   colorCategory: z.string().optional(),
+  imageUrl: z.string().optional(),
 });
 
 export async function GET() {

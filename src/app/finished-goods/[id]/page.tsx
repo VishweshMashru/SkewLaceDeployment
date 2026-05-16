@@ -42,9 +42,11 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
       productName: product?.name ?? "",
       designNumber: product?.designNumber,
       sku: product?.sku,
+      colorCategory: product?.colorCategory,
       quantity: fg.quantity,
       id: fg.id,
       dataUrl,
+      imageUrl: product?.imageUrl,
     });
   }
 
@@ -127,16 +129,23 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* QR */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center gap-4">
-        <QRDisplay ref={qrRef} value={`${baseUrl}/finished-goods/${fg.id}`} size={180} />
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-slate-800">{product?.name}</h1>
-          {product?.designNumber && <p className="text-sm text-slate-500 mt-1">Design {product.designNumber}</p>}
-          {product?.colorCategory && (
-            <span className="inline-block mt-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
-              {product.colorCategory}
-            </span>
-          )}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        {product?.imageUrl && (
+          <div className="w-full aspect-[3/2] relative">
+            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+          </div>
+        )}
+        <div className="p-6 flex flex-col items-center gap-4">
+          <QRDisplay ref={qrRef} value={`${baseUrl}/finished-goods/${fg.id}`} size={180} />
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-slate-800">{product?.name}</h1>
+            {product?.designNumber && <p className="text-sm text-slate-500 mt-1">Design {product.designNumber}</p>}
+            {product?.colorCategory && (
+              <span className="inline-block mt-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
+                {product.colorCategory}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

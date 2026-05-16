@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, Layers, X, CheckCircle } from "lucide-react";
 import QRCode from "qrcode";
+import { printBulkLabels } from "@/lib/print";
 import type { Product } from "@/db/schema";
 
 interface GeneratedLabel {
@@ -75,61 +76,11 @@ export default function BulkPrintPage() {
 
   function handlePrint() {
     if (!result) return;
-    const { product } = result;
-    const labelHtml = result.created.map(label => {
-      const dataUrl = qrDataUrls[label.id] || "";
-      return `
-        <div class="label">
-          <div class="brand">LybyTex</div>
-          <div class="brand-url">lybytex.com</div>
-          <hr class="divider" />
-          <div class="name">${product.name}</div>
-          <div class="sub">${product.designNumber ? `Design ${product.designNumber}` : product.sku}</div>
-          ${dataUrl ? `<img src="${dataUrl}" class="qr" />` : `<div class="qr-placeholder">QR</div>`}
-          <div class="qty">${label.quantity}</div>
-          <div class="pcs">pcs</div>
-          <div class="id">${label.id}</div>
-        </div>`;
-    }).join("");
-
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head>
-<title>Bulk Labels — ${product.name}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { width:100%; height:auto; }
-  body { font-family:-apple-system,sans-serif; background:#fff; padding:8mm; }
-  .grid { display:flex; flex-wrap:wrap; gap:5mm; }
-  .label {
-    border:1.5px solid #1d4ed8;
-    border-radius:8px;
-    padding:7px 8px;
-    width:44mm;
-    text-align:center;
-    page-break-inside:avoid;
-    break-inside:avoid;
-  }
-  .brand     { font-size:8px; font-weight:800; color:#1d4ed8; letter-spacing:.06em; text-transform:uppercase; }
-  .brand-url { font-size:6px; color:#94a3b8; margin-bottom:3px; }
-  .divider   { border:none; border-top:1px solid #e2e8f0; margin:3px 0; }
-  .name      { font-size:9px; font-weight:700; color:#1e3a5f; line-height:1.2; margin-bottom:1px; }
-  .sub       { font-size:7px; color:#64748b; margin-bottom:4px; }
-  .qr        { width:36mm; height:36mm; display:block; margin:0 auto 4px; }
-  .qr-placeholder { width:36mm; height:36mm; background:#f1f5f9; margin:0 auto 4px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#94a3b8; }
-  .qty       { font-size:14px; font-weight:900; color:#1d4ed8; line-height:1; }
-  .pcs       { font-size:7px; color:#94a3b8; margin-bottom:2px; }
-  .id        { font-size:6px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
-  @page { margin:5mm; size:auto; }
-  @media print {
-    html, body { height:auto !important; overflow:visible !important; }
-  }
-</style></head><body>
-<div class="grid">${labelHtml}</div>
-<script>window.onload = () => { window.print(); window.close(); }</script>
-</body></html>`);
-    win.document.close();
+    printBulkLabels({
+      product: result.product,
+      labels: result.created,
+      qrDataUrls,
+    });
   }
 
   const selectedProduct = products.find(p => p.id === productId);

@@ -86,9 +86,11 @@ export default function FinishedGoodsPage() {
       productName: newItem.product?.name ?? "",
       designNumber: newItem.product?.designNumber,
       sku: newItem.product?.sku,
+      colorCategory: newItem.product?.colorCategory,
       quantity: newItem.quantity,
       id: newItem.id,
       dataUrl: qrRef.current?.getDataUrl() ?? null,
+      imageUrl: newItem.product?.imageUrl,
     });
   }
 
