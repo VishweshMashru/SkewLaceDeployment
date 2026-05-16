@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Plus, QrCode, X, Printer, ExternalLink, Layers } from "lucide-react";
 import Link from "next/link";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
+import { printFGLabel } from "@/lib/print";
 import type { Product } from "@/db/schema";
 
 const schema = z.object({
@@ -35,7 +36,6 @@ export default function FinishedGoodsPage() {
   const [newItem, setNewItem]     = useState<any>(null);
   const [error, setError]         = useState("");
   const qrRef = useRef<QRDisplayHandle>(null);
-
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { trackingType: "dozen" },
@@ -82,33 +82,14 @@ export default function FinishedGoodsPage() {
 
   function handlePrint() {
     if (!newItem) return;
-    const dataUrl = qrRef.current?.getDataUrl();
-    const { product } = newItem;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Label — ${newItem.id}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-  .label { border:2px solid #1d4ed8; border-radius:12px; padding:18px 20px; width:220px; text-align:center; }
-  .name  { font-size:15px; font-weight:700; color:#1e3a5f; margin-bottom:2px; }
-  .design{ font-size:11px; color:#64748b; margin-bottom:10px; }
-  .qr    { width:160px; height:160px; margin:0 auto 10px; display:block; }
-  .qty   { font-size:26px; font-weight:900; color:#1d4ed8; margin-bottom:2px; }
-  .pcs   { font-size:11px; color:#94a3b8; margin-bottom:6px; }
-  .id    { font-size:9px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
-</style></head><body>
-<div class="label">
-  <div class="name">${product?.name ?? ""}</div>
-  ${product?.designNumber ? `<div class="design">Design ${product.designNumber}</div>` : `<div class="design">${product?.sku ?? ""}</div>`}
-  ${dataUrl ? `<img class="qr" src="${dataUrl}" />` : ""}
-  <div class="qty">${newItem.quantity}</div>
-  <div class="pcs">pieces</div>
-  <div class="id">${newItem.id}</div>
-</div>
-<script>window.onload = () => { window.print(); window.close(); }</script>
-</body></html>`);
-    win.document.close();
+    printFGLabel({
+      productName: newItem.product?.name ?? "",
+      designNumber: newItem.product?.designNumber,
+      sku: newItem.product?.sku,
+      quantity: newItem.quantity,
+      id: newItem.id,
+      dataUrl: qrRef.current?.getDataUrl() ?? null,
+    });
   }
 
   return (

@@ -14,7 +14,8 @@ export async function GET() {
     const all = await db.select().from(cartons).orderBy(desc(cartons.createdAt));
     return NextResponse.json(all);
   } catch (e) {
-    return NextResponse.json({ error: "Failed to fetch cartons" }, { status: 500 });
+    console.error("GET /api/cartons error:", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Package, Box, CheckCircle, Truck, Clock, Printer, Trash2 } from "lucide-react";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
+import { printFGLabel } from "@/lib/print";
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
   available: { label: "Available", icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
@@ -34,34 +35,17 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
   }, [id]);
 
   function handlePrint() {
-    const dataUrl = qrRef.current?.getDataUrl();
+    const dataUrl = qrRef.current?.getDataUrl() ?? null;
     if (!data) return;
     const { fg, product } = data;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Label — ${fg.id}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #fff; }
-  .label { border: 2px solid #1d4ed8; border-radius: 12px; padding: 18px 20px; width: 220px; text-align: center; }
-  .name  { font-size: 15px; font-weight: 700; color: #1e3a5f; margin-bottom: 2px; }
-  .design{ font-size: 11px; color: #64748b; margin-bottom: 10px; }
-  .qr    { width: 160px; height: 160px; margin: 0 auto 10px; display: block; }
-  .qty   { font-size: 26px; font-weight: 900; color: #1d4ed8; margin-bottom: 2px; }
-  .pcs   { font-size: 11px; color: #94a3b8; margin-bottom: 6px; }
-  .id    { font-size: 9px; color: #cbd5e1; font-family: monospace; word-break: break-all; }
-</style></head><body>
-<div class="label">
-  <div class="name">${product?.name ?? ""}</div>
-  ${product?.designNumber ? `<div class="design">Design ${product.designNumber}</div>` : `<div class="design">${product?.sku ?? ""}</div>`}
-  ${dataUrl ? `<img class="qr" src="${dataUrl}" />` : ""}
-  <div class="qty">${fg.quantity}</div>
-  <div class="pcs">pieces</div>
-  <div class="id">${fg.id}</div>
-</div>
-<script>window.onload = () => { window.print(); window.close(); }</script>
-</body></html>`);
-    win.document.close();
+    printFGLabel({
+      productName: product?.name ?? "",
+      designNumber: product?.designNumber,
+      sku: product?.sku,
+      quantity: fg.quantity,
+      id: fg.id,
+      dataUrl,
+    });
   }
 
   async function handleDelete() {

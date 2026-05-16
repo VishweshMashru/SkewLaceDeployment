@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Box, Package, Printer, ScanLine, Truck, Lock, Trash2 } from "lucide-react";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
+import { printCartonLabel } from "@/lib/print";
 
 const statusColors: Record<string, string> = {
   open:       "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -59,40 +60,19 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
   function handlePrint() {
     if (!data) return;
     const { carton, summary } = data;
-    const dataUrl = qrRef.current?.getDataUrl();
-    const rows = summary
-      .map((s: any) => `<tr><td>${s.productName}</td><td style="color:#64748b;font-size:11px">${s.sku}</td><td style="text-align:right;font-weight:600">${s.totalPieces}</td></tr>`)
-      .join("");
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Carton — ${carton.cartonNumber}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-  .label { border:3px solid #7c3aed; border-radius:12px; padding:20px; width:260px; text-align:center; }
-  h2  { font-size:13px; color:#6b21a8; font-weight:700; margin-bottom:4px; letter-spacing:.05em; text-transform:uppercase; }
-  .num{ font-size:18px; font-weight:900; color:#7c3aed; margin-bottom:12px; font-family:monospace; }
-  img { width:160px; height:160px; margin:0 auto 12px; display:block; }
-  .total-line { font-size:14px; font-weight:700; margin-bottom:12px; color:#1e293b; }
-  table { width:100%; border-collapse:collapse; font-size:12px; text-align:left; }
-  td { padding:4px 6px; border-bottom:1px solid #f1f5f9; }
-  tr:last-child td { border-bottom:none; font-weight:700; font-size:13px; }
-  .notes { font-size:10px; color:#94a3b8; margin-top:10px; }
-</style></head><body>
-<div class="label">
-  <h2>CartonTrack</h2>
-  <div class="num">${carton.cartonNumber}</div>
-  ${dataUrl ? `<img src="${dataUrl}" />` : ""}
-  <div class="total-line">${carton.totalPieces} pieces total</div>
-  <table>
-    ${rows}
-    <tr><td colspan="2"><strong>TOTAL</strong></td><td style="text-align:right">${carton.totalPieces}</td></tr>
-  </table>
-  ${carton.notes ? `<div class="notes">${carton.notes}</div>` : ""}
-</div>
-<script>window.onload = () => { window.print(); window.close(); }</script>
-</body></html>`);
-    win.document.close();
+    printCartonLabel({
+      cartonNumber: carton.cartonNumber,
+      totalPieces: carton.totalPieces,
+      summary: summary.map((s: any) => ({
+        productName: s.productName,
+        sku: s.sku,
+        colorCategory: s.colorCategory ?? null,
+        designNumber: s.designNumber ?? null,
+        totalPieces: s.totalPieces,
+      })),
+      notes: carton.notes,
+      dataUrl: qrRef.current?.getDataUrl() ?? null,
+    });
   }
 
   if (loading) return (
@@ -172,9 +152,18 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
               <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                 <div>
                   <p className="font-medium text-slate-800 text-sm">{s.productName}</p>
-                  <p className="text-xs text-slate-400 font-mono">{s.sku} · {s.items} label{s.items !== 1 ? "s" : ""}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="text-xs text-slate-400 font-mono">{s.sku}</span>
+                    {s.designNumber && (
+                      <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Design {s.designNumber}</span>
+                    )}
+                    {s.colorCategory && (
+                      <span className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{s.colorCategory}</span>
+                    )}
+                    <span className="text-xs text-slate-400">{s.items} label{s.items !== 1 ? "s" : ""}</span>
+                  </div>
                 </div>
-                <span className="font-bold text-slate-700">{s.totalPieces} pcs</span>
+                <span className="font-bold text-slate-700 ml-2">{s.totalPieces} pcs</span>
               </div>
             ))}
             <div className="flex items-center justify-between py-2 font-bold">

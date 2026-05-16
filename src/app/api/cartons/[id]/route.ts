@@ -25,13 +25,15 @@ export async function GET(
       .leftJoin(products, eq(finishedGoods.productId, products.id))
       .where(eq(finishedGoods.cartonId, id));
 
-    const summary: Record<string, { productName: string; sku: string; totalPieces: number; items: number }> = {};
+    const summary: Record<string, { productName: string; sku: string; colorCategory: string | null; designNumber: string | null; totalPieces: number; items: number }> = {};
     for (const row of items) {
       const pid = row.fg.productId;
       if (!summary[pid]) {
         summary[pid] = {
           productName: row.product?.name ?? "Unknown",
           sku: row.product?.sku ?? "",
+          colorCategory: row.product?.colorCategory ?? null,
+          designNumber: row.product?.designNumber ?? null,
           totalPieces: 0,
           items: 0,
         };
