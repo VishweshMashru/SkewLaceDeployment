@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Box, Package, Printer, ScanLine, Truck, Lock, Trash2 } from "lucide-react";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printCartonLabel } from "@/lib/print";
+import { useAppSession } from "@/components/SessionProvider";
 
 const statusColors: Record<string, string> = {
   open:       "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -15,6 +16,7 @@ const statusColors: Record<string, string> = {
 export default function CartonDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { canEdit, canDelete } = useAppSession();
   const [data, setData]             = useState<any>(null);
   const [loading, setLoading]       = useState(true);
   const [notFound, setNotFound]     = useState(false);
@@ -95,24 +97,27 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
     <div className="space-y-4">
       {/* Top bar */}
       <div className="flex items-center justify-between">
-        <Link href="/cartons" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
-          <ArrowLeft size={16} /> Back to Cartons
-        </Link>
+        {canEdit ? (
+          <Link href="/cartons" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
+            <ArrowLeft size={16} /> Back to Cartons
+          </Link>
+        ) : <div />}
         <div className="flex items-center gap-2">
-          <button onClick={handlePrint}
-            className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
-            <Printer size={14} /> Print
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-              confirmDelete ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-600 hover:bg-red-100"
-            }`}
-          >
-            <Trash2 size={14} />
-            {deleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
-          </button>
+          {canEdit && (
+            <button onClick={handlePrint}
+              className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+              <Printer size={14} /> Print
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={handleDelete} disabled={deleting}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                confirmDelete ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-600 hover:bg-red-100"
+              }`}>
+              <Trash2 size={14} />
+              {deleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,8 +201,8 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* Actions */}
-      {carton.status !== "dispatched" && (
+      {/* Actions — staff/admin only */}
+      {canEdit && carton.status !== "dispatched" && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
           <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Actions</h2>
           {carton.status === "open" && (

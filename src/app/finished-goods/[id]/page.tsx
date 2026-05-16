@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Package, Box, CheckCircle, Truck, Clock, Printer, Trash2 } from "lucide-react";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printFGLabel } from "@/lib/print";
+import { useAppSession } from "@/components/SessionProvider";
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
   available: { label: "Available", icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
@@ -16,6 +17,7 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
 export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { canEdit, canDelete } = useAppSession();
   const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -90,31 +92,29 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
     <div className="space-y-4">
       {/* Top bar */}
       <div className="flex items-center justify-between">
-        <Link href="/finished-goods" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
-          <ArrowLeft size={16} /> Back to Labels
-        </Link>
+        {canEdit ? (
+          <Link href="/finished-goods" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
+            <ArrowLeft size={16} /> Back to Labels
+          </Link>
+        ) : <div />}
         <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <Printer size={14} /> Print
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-              confirmDelete
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : "bg-red-50 text-red-600 hover:bg-red-100"
-            }`}
-          >
-            <Trash2 size={14} />
-            {deleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
-          </button>
+          {canEdit && (
+            <button onClick={handlePrint}
+              className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+              <Printer size={14} /> Print
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={handleDelete} disabled={deleting}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                confirmDelete ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-600 hover:bg-red-100"
+              }`}>
+              <Trash2 size={14} />
+              {deleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
+            </button>
+          )}
         </div>
       </div>
-
       {/* Status banner */}
       <div className={`rounded-2xl border-2 p-4 flex items-center gap-3 ${status.bg}`}>
         <StatusIcon size={24} className={status.color} />
