@@ -24,6 +24,25 @@ export const appUsers = pgTable("app_users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const batchStatusEnum = pgEnum("batch_status", [
+  "preparing",
+  "sealed",
+  "dispatched",
+]);
+
+export const batches = pgTable("batches", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  destination: text("destination"),
+  notes: text("notes"),
+  status: batchStatusEnum("status").default("preparing").notNull(),
+  totalPieces: integer("total_pieces").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Batch = typeof batches.$inferSelect;
+export type NewBatch = typeof batches.$inferInsert;
+
 export const products = pgTable("products", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -50,6 +69,7 @@ export const finishedGoods = pgTable("finished_goods", {
 export const cartons = pgTable("cartons", {
   id: text("id").primaryKey(),
   cartonNumber: text("carton_number").notNull().unique(),
+  batchId: text("batch_id").references(() => batches.id),
   status: cartonStatusEnum("status").default("open").notNull(),
   notes: text("notes"),
   totalPieces: integer("total_pieces").default(0).notNull(),

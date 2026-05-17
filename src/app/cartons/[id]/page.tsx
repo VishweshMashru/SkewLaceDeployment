@@ -26,11 +26,24 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
   const qrRef = useRef<QRDisplayHandle>(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
   async function fetchData() {
     const res = await fetch(`/api/cartons/${id}`);
     if (res.status === 404) { setNotFound(true); setLoading(false); return; }
     setData(await res.json());
     setLoading(false);
+  }
+
+  async function removeItem(fgId: string) {
+    setRemovingId(fgId);
+    const res = await fetch(`/api/cartons/${id}/remove-item`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ finishedGoodsId: fgId }),
+    });
+    if (res.ok) await fetchData();
+    setRemovingId(null);
   }
   useEffect(() => { fetchData(); }, [id]);
 
@@ -185,17 +198,29 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
           <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-3">Packed Labels</h2>
           <div className="space-y-2">
             {items.map((item: any) => (
-              <Link key={item.fg.id} href={`/finished-goods/${item.fg.id}`}
-                className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 -mx-1 px-1 rounded-lg transition-colors">
-                <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Package size={14} className="text-emerald-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{item.product?.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{item.fg.id.slice(-12)}</p>
-                </div>
-                <span className="text-sm font-semibold text-slate-700">{item.fg.quantity} pcs</span>
-              </Link>
+              <div key={item.fg.id} className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0">
+                <Link href={`/finished-goods/${item.fg.id}`}
+                  className="flex items-center gap-3 flex-1 min-w-0 hover:bg-slate-50 -mx-1 px-1 rounded-lg transition-colors">
+                  <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Package size={14} className="text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{item.product?.name}</p>
+                    <p className="text-xs text-slate-400 font-mono">{item.fg.id.slice(-12)}</p>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">{item.fg.quantity} pcs</span>
+                </Link>
+                {canEdit && carton.status !== "dispatched" && (
+                  <button
+                    onClick={() => removeItem(item.fg.id)}
+                    disabled={removingId === item.fg.id}
+                    className="flex-shrink-0 text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-40 ml-1"
+                    title="Remove from carton"
+                  >
+                    {removingId === item.fg.id ? "…" : "Remove"}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>

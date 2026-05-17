@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Package, Box, QrCode, Search, BarChart3, LogOut, ShieldCheck } from "lucide-react";
+import { Package, Box, QrCode, Search, BarChart3, LogOut, ShieldCheck, Archive } from "lucide-react";
 import { useAppSession } from "./SessionProvider";
 import { signOut } from "next-auth/react";
 
@@ -10,7 +10,8 @@ const navItems = [
   { href: "/products",       label: "Products",  icon: Package   },
   { href: "/finished-goods", label: "Labels",    icon: QrCode    },
   { href: "/cartons",        label: "Cartons",   icon: Box       },
-  { href: "/search",         label: "Search",    icon: Search    },
+  { href: "/batches",   label: "Batches",   icon: Archive  },
+  { href: "/search",    label: "Search",    icon: Search   },
 ];
 
 const roleColors: Record<string, string> = {
