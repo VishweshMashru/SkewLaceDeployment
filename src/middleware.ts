@@ -1,55 +1,57 @@
-import { auth } from "@/lib/auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-// Pages that anyone (including unauthenticated) can view
 const PUBLIC_VIEW_PAGES = [
   "/finished-goods/",
   "/cartons/",
   "/login",
 ];
 
-export default auth((req) => {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const session = req.auth;
-  const role = (session?.user as any)?.role ?? null;
+  const method = req.method;
 
-  // Always allow auth API and static
+  // Always allow auth routes
   if (pathname.startsWith("/api/auth")) return NextResponse.next();
 
-  // All API GETs are public
-  if (req.method === "GET" && pathname.startsWith("/api/")) return NextResponse.next();
+  // All GET API requests are public
+  if (method === "GET" && pathname.startsWith("/api/")) return NextResponse.next();
 
-  // Write APIs need session
-  if (req.method !== "GET" && pathname.startsWith("/api/")) {
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Get token directly from cookie — no HTTP call
+  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
+  const role = (token?.role as string) ?? null;
+
+  // Write API requests need auth
+  if (method !== "GET" && pathname.startsWith("/api/")) {
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.next();
   }
 
-  // Login page — redirect to home if already logged in
+  // Login page
   if (pathname === "/login") {
-    if (session) return NextResponse.redirect(new URL("/", req.url));
+    if (token) return NextResponse.redirect(new URL("/", req.url));
     return NextResponse.next();
   }
 
-  // Public view pages (QR scan targets) — always accessible
+  // Public QR scan pages — always accessible
   if (PUBLIC_VIEW_PAGES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
   // Not logged in — redirect to login
-  if (!session) {
+  if (!token) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged in as viewer — only allow the public view pages, redirect everything else to home
+  // Viewer role — only public pages
   if (role === "viewer") {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
