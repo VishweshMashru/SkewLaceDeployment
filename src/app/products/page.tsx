@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Package, X, Trash2, ImagePlus, Loader2, Pencil, Check } from "lucide-react";
+import { uploadImage } from "@/lib/upload";
 import type { Product } from "@/db/schema";
 import { useAppSession } from "@/components/SessionProvider";
 
@@ -52,10 +53,7 @@ function ProductCard({
       let imageUrl = p.imageUrl;
       if (imageFile) {
         setUploading(true);
-        const fd = new FormData();
-        fd.append("file", imageFile);
-        const upRes = await fetch("/api/upload", { method: "POST", body: fd });
-        if (upRes.ok) { const upData = await upRes.json(); imageUrl = upData.url; }
+        imageUrl = await uploadImage(imageFile);
         setUploading(false);
       }
       await fetch(`/api/products/${p.id}`, {
@@ -192,11 +190,7 @@ export default function ProductsPage() {
       let imageUrl: string | undefined;
       if (imageFile) {
         setUploading(true);
-        const fd = new FormData();
-        fd.append("file", imageFile);
-        const upRes = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!upRes.ok) throw new Error("Image upload failed");
-        imageUrl = (await upRes.json()).url;
+        imageUrl = await uploadImage(imageFile);
         setUploading(false);
       }
       const res = await fetch("/api/products", {
