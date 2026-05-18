@@ -11,7 +11,6 @@ export async function uploadImage(file: File): Promise<string> {
   formData.append("timestamp", String(timestamp));
   formData.append("signature", signature);
   formData.append("folder", folder);
-  formData.append("transformation", "w_800,h_800,c_limit,q_auto,f_auto");
 
   const uploadRes = await fetch(
     `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
