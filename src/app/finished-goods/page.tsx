@@ -3,8 +3,9 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, QrCode, X, Printer, ExternalLink, Layers, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { Plus, QrCode, X, Printer, ExternalLink, Layers, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printFGLabel } from "@/lib/print";
 import type { Product } from "@/db/schema";
@@ -22,41 +23,28 @@ const statusColors: Record<string, string> = {
   dispatched: "bg-blue-50 text-blue-700 border-blue-200",
 };
 
-function formatDateGroup(dateStr: string): string {
-  const date = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+type StatusFilter = "all" | "available" | "packed" | "dispatched";
 
-  const d = date.toDateString();
-  if (d === today.toDateString()) return "Today";
-  if (d === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-}
-
-function groupByDate(items: any[]) {
-  const groups: Record<string, any[]> = {};
-  for (const item of items) {
-    const key = new Date(item.fg.createdAt).toDateString();
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
-  }
-  return groups;
+interface ProductGroup {
+  productId: string;
+  productName: string;
+  sku: string;
+  imageUrl: string | null;
+  items: any[];
 }
 
 export default function FinishedGoodsPage() {
-  const [items, setItems]           = useState<any[]>([]);
-  const [products, setProducts]     = useState<Product[]>([]);
-  const [showForm, setShowForm]     = useState(false);
-  const [loading, setLoading]       = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [newItem, setNewItem]       = useState<any>(null);
-  const [error, setError]           = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [productFilter, setProductFilter] = useState<string>("all");
-  const [showFilters, setShowFilters]   = useState(false);
-  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const [items, setItems]             = useState<any[]>([]);
+  const [products, setProducts]       = useState<Product[]>([]);
+  const [showForm, setShowForm]       = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [submitting, setSubmitting]   = useState(false);
+  const [newItem, setNewItem]         = useState<any>(null);
+  const [error, setError]             = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
   const qrRef = useRef<QRDisplayHandle>(null);
+  const router = useRouter();
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
@@ -105,41 +93,50 @@ export default function FinishedGoodsPage() {
     });
   }
 
-  function toggleDate(key: string) {
-    setCollapsedDates(prev => {
+  function toggleCollapse(productId: string) {
+    setCollapsed(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(productId)) next.delete(productId); else next.add(productId);
       return next;
     });
   }
 
-  // Apply filters
-  const filtered = items.filter(item => {
-    if (statusFilter !== "all" && item.fg.status !== statusFilter) return false;
-    if (productFilter !== "all" && item.fg.productId !== productFilter) return false;
-    return true;
-  });
+  // Filter and group by product
+  const filtered = items.filter(item => statusFilter === "all" || item.fg.status === statusFilter);
 
-  const grouped = groupByDate(filtered);
-  const dateKeys = Object.keys(grouped); // already sorted newest-first from API
+  const groups: ProductGroup[] = [];
+  const seen = new Map<string, number>();
+  for (const item of filtered) {
+    const pid = item.fg.productId;
+    if (!seen.has(pid)) {
+      seen.set(pid, groups.length);
+      groups.push({
+        productId: pid,
+        productName: item.product?.name ?? "Unknown",
+        sku: item.product?.sku ?? "",
+        imageUrl: item.product?.imageUrl ?? null,
+        items: [],
+      });
+    }
+    groups[seen.get(pid)!].items.push(item);
+  }
 
-  const activeFilters = (statusFilter !== "all" ? 1 : 0) + (productFilter !== "all" ? 1 : 0);
+  const statusCounts = {
+    all:        items.length,
+    available:  items.filter(i => i.fg.status === "available").length,
+    packed:     items.filter(i => i.fg.status === "packed").length,
+    dispatched: items.filter(i => i.fg.status === "dispatched").length,
+  };
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-slate-800">Labels</h1>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowFilters(!showFilters)}
-            className={"flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors " +
-              (activeFilters > 0 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")}>
-            <Filter size={14} />
-            {activeFilters > 0 ? activeFilters + " Filter" + (activeFilters > 1 ? "s" : "") : "Filter"}
-          </button>
           <Link href="/finished-goods/bulk"
             className="flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">
-            <Layers size={15} />
-            <span className="hidden sm:inline">Bulk</span>
+            <Layers size={15} /><span className="hidden sm:inline">Bulk</span>
           </Link>
           <button onClick={() => { setShowForm(!showForm); setNewItem(null); }}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors">
@@ -149,37 +146,17 @@ export default function FinishedGoodsPage() {
         </div>
       </div>
 
-      {/* Filter bar */}
-      {showFilters && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="all">All statuses</option>
-                <option value="available">Available</option>
-                <option value="packed">Packed</option>
-                <option value="dispatched">Dispatched</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Product</label>
-              <select value={productFilter} onChange={e => setProductFilter(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="all">All products</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-          </div>
-          {activeFilters > 0 && (
-            <button onClick={() => { setStatusFilter("all"); setProductFilter("all"); }}
-              className="text-xs text-slate-500 hover:text-red-500 transition-colors">
-              Clear filters
-            </button>
-          )}
-        </div>
-      )}
+      {/* Status filter tabs */}
+      <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1">
+        {(["all", "available", "packed", "dispatched"] as StatusFilter[]).map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            className={`flex-1 py-1.5 rounded-xl text-xs font-medium transition-colors capitalize ${
+              statusFilter === s ? "bg-blue-600 text-white" : "text-slate-500 hover:bg-slate-50"
+            }`}>
+            {s === "all" ? `All (${statusCounts.all})` : `${s.charAt(0).toUpperCase() + s.slice(1)} (${statusCounts[s]})`}
+          </button>
+        ))}
+      </div>
 
       {/* New label form */}
       {showForm && (
@@ -195,22 +172,20 @@ export default function FinishedGoodsPage() {
               </select>
               {errors.productId && <p className="text-red-500 text-xs mt-1">{errors.productId.message}</p>}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-2">Tracking Type *</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["piece", "dozen", "manual"] as const).map(type => (
-                  <label key={type} className="cursor-pointer">
-                    <input type="radio" {...register("trackingType")} value={type} className="sr-only" />
-                    <div className={"border-2 rounded-xl p-2.5 text-center text-sm font-medium transition-colors " +
-                      (trackingType === type ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:border-slate-300")}>
-                      {type === "piece" ? "1 Piece" : type === "dozen" ? "1 Dozen" : "Manual"}
-                    </div>
-                  </label>
-                ))}
-              </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(["piece", "dozen", "manual"] as const).map(type => (
+                <label key={type} className="cursor-pointer">
+                  <input type="radio" {...register("trackingType")} value={type} className="sr-only" />
+                  <div className={`border-2 rounded-xl p-2.5 text-center text-sm font-medium transition-colors ${
+                    trackingType === type ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600"
+                  }`}>
+                    {type === "piece" ? "1 Piece" : type === "dozen" ? "1 Dozen" : "Manual"}
+                  </div>
+                </label>
+              ))}
             </div>
             {trackingType === "manual" && (
-              <input type="number" {...register("quantity")} placeholder="Enter quantity" min={1}
+              <input type="number" {...register("quantity")} placeholder="Quantity" min={1}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             )}
             {error && <p className="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}
@@ -225,74 +200,90 @@ export default function FinishedGoodsPage() {
       {/* New label result */}
       {newItem && (
         <div className="bg-white rounded-2xl border-2 border-emerald-300 p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-emerald-700">✓ Label Created!</h2>
             <div className="flex gap-2">
               <button onClick={handlePrint}
-                className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+                className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">
                 <Printer size={14} /> Print
               </button>
               <Link href={"/finished-goods/" + newItem.id}
-                className="flex items-center gap-1.5 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                className="flex items-center gap-1.5 text-sm bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg">
                 <ExternalLink size={14} /> View
               </Link>
             </div>
           </div>
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-2">
+            <QRDisplay ref={qrRef} value={baseUrl + "/finished-goods/" + newItem.id} size={140} />
             <p className="font-bold text-slate-800 text-sm">{newItem.product?.name}</p>
-            <QRDisplay ref={qrRef} value={baseUrl + "/finished-goods/" + newItem.id} size={160} />
-            <p className="text-2xl font-black text-blue-600">{newItem.quantity} pcs</p>
-            <p className="text-xs text-slate-500 font-mono">{newItem.id}</p>
+            <p className="text-xl font-black text-blue-600">{newItem.quantity} pcs</p>
+            <p className="text-xs text-slate-400 font-mono">{newItem.id}</p>
           </div>
         </div>
       )}
 
-      {/* Labels list grouped by date */}
+      {/* Labels grouped by product/SKU */}
       {loading ? (
-        <div className="text-center text-slate-400 py-8">Loading...</div>
+        <div className="text-center py-8 text-slate-400">Loading...</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
-          <QrCode size={40} className="mx-auto text-slate-300 mb-3" />
-          <p className="text-slate-500">{activeFilters > 0 ? "No labels match your filters." : "No labels yet."}</p>
+          <QrCode size={36} className="mx-auto text-slate-300 mb-3" />
+          <p className="text-slate-500">{statusFilter !== "all" ? `No ${statusFilter} labels` : "No labels yet"}</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {dateKeys.map(dateKey => {
-            const dayItems = grouped[dateKey];
-            const label = formatDateGroup(dayItems[0].fg.createdAt);
-            const isCollapsed = collapsedDates.has(dateKey);
+        <div className="space-y-3">
+          {groups.map(group => {
+            const isCollapsed = collapsed.has(group.productId);
+            const statusBreakdown = {
+              available:  group.items.filter(i => i.fg.status === "available").length,
+              packed:     group.items.filter(i => i.fg.status === "packed").length,
+              dispatched: group.items.filter(i => i.fg.status === "dispatched").length,
+            };
             return (
-              <div key={dateKey}>
-                <button onClick={() => toggleDate(dateKey)}
-                  className="flex items-center justify-between w-full px-1 mb-2">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    {label} <span className="font-normal normal-case">({dayItems.length} label{dayItems.length !== 1 ? "s" : ""})</span>
-                  </span>
-                  {isCollapsed ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronUp size={14} className="text-slate-400" />}
+              <div key={group.productId} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                {/* Folder header */}
+                <button onClick={() => toggleCollapse(group.productId)}
+                  className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 transition-colors">
+                  {group.imageUrl ? (
+                    <img src={group.imageUrl} className="w-11 h-11 rounded-xl object-cover flex-shrink-0" alt="" />
+                  ) : (
+                    <div className="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <QrCode size={18} className="text-emerald-600" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 text-sm">{group.productName}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs font-mono text-blue-600">{group.sku}</span>
+                      <span className="text-xs text-slate-400">{group.items.length} labels</span>
+                      {statusBreakdown.available > 0 && <span className="text-xs text-emerald-600 font-medium">{statusBreakdown.available} available</span>}
+                      {statusBreakdown.packed > 0 && <span className="text-xs text-amber-600">{statusBreakdown.packed} packed</span>}
+                      {statusBreakdown.dispatched > 0 && <span className="text-xs text-blue-600">{statusBreakdown.dispatched} dispatched</span>}
+                    </div>
+                  </div>
+                  {isCollapsed ? <ChevronDown size={16} className="text-slate-400 flex-shrink-0" /> : <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />}
                 </button>
+
+                {/* Labels inside folder */}
                 {!isCollapsed && (
-                  <div className="space-y-2">
-                    {dayItems.map((item: any) => (
-                      <Link key={item.fg.id} href={"/finished-goods/" + item.fg.id}
-                        className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3 hover:shadow-sm transition-all active:scale-[0.99] block">
-                        {item.product?.imageUrl ? (
-                          <img src={item.product.imageUrl} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" alt={item.product.name} />
-                        ) : (
-                          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <QrCode size={18} className="text-emerald-600" />
-                          </div>
-                        )}
+                  <div className="border-t border-slate-100 divide-y divide-slate-50">
+                    {group.items.map((item: any) => (
+                      <div key={item.fg.id}
+                        onClick={() => router.push("/finished-goods/" + item.fg.id)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-800 text-sm truncate">{item.product?.name}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-slate-500">{item.fg.quantity} pcs</span>
-                            <span className={"text-xs px-2 py-0.5 rounded-full border " + (statusColors[item.fg.status] ?? "")}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-slate-400">{item.fg.id.slice(-12)}</span>
+                            <span className={"text-xs px-1.5 py-0.5 rounded-full border " + statusColors[item.fg.status]}>
                               {item.fg.status}
                             </span>
                           </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {new Date(item.fg.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </p>
                         </div>
-                        <span className="text-slate-300 text-xs font-mono hidden sm:block">{item.fg.id.slice(-8)}</span>
-                      </Link>
+                        <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{item.fg.quantity} pcs</span>
+                      </div>
                     ))}
                   </div>
                 )}
