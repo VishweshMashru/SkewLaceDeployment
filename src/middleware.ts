@@ -18,7 +18,10 @@ export async function middleware(req: NextRequest) {
   if (method === "GET" && pathname.startsWith("/api/")) return NextResponse.next();
 
   // Get token directly from cookie — no HTTP call
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
+  const token = await getToken({ 
+    req, 
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET 
+  });
   const role = (token?.role as string) ?? null;
 
   // Write API requests need auth
@@ -27,9 +30,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Login page
+  // Login page — always accessible
   if (pathname === "/login") {
-    if (token) return NextResponse.redirect(new URL("/", req.url));
     return NextResponse.next();
   }
 
