@@ -43,6 +43,8 @@ export default function FinishedGoodsPage() {
   const [error, setError]             = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
+  const [confirmDeleteProduct, setConfirmDeleteProduct] = useState<string | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<string | null>(null);
   const qrRef = useRef<QRDisplayHandle>(null);
   const router = useRouter();
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -93,8 +95,24 @@ export default function FinishedGoodsPage() {
     });
   }
 
-  function toggleCollapse(productId: string) {
-    setCollapsed(prev => {
+  async function handleDeleteByProduct(productId: string) {
+    if (confirmDeleteProduct !== productId) {
+      setConfirmDeleteProduct(productId);
+      return;
+    }
+    setDeletingProduct(productId);
+    const res = await fetch("/api/finished-goods/delete-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId, status: "available" }),
+    });
+    const data = await res.json();
+    setConfirmDeleteProduct(null);
+    setDeletingProduct(null);
+    await fetchData();
+  }
+
+  function toggleCollapse(productId: string) {    setCollapsed(prev => {
       const next = new Set(prev);
       if (next.has(productId)) next.delete(productId); else next.add(productId);
       return next;
@@ -263,6 +281,31 @@ export default function FinishedGoodsPage() {
                   </div>
                   {isCollapsed ? <ChevronDown size={16} className="text-slate-400 flex-shrink-0" /> : <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />}
                 </button>
+
+                {/* Per-product delete available labels */}
+                {statusBreakdown.available > 0 && (
+                  <div className="px-4 pb-3 flex items-center justify-between border-b border-slate-100">
+                    <p className="text-xs text-slate-400">Delete {statusBreakdown.available} available labels for this SKU</p>
+                    <div className="flex items-center gap-2">
+                      {confirmDeleteProduct === group.productId && (
+                        <button onClick={() => setConfirmDeleteProduct(null)}
+                          className="text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+                      )}
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteByProduct(group.productId); }}
+                        disabled={deletingProduct === group.productId}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex-shrink-0 ${
+                          confirmDeleteProduct === group.productId
+                            ? "bg-red-600 text-white"
+                            : "bg-red-50 text-red-500 hover:bg-red-100"
+                        }`}>
+                        {deletingProduct === group.productId ? "Deleting…"
+                          : confirmDeleteProduct === group.productId ? "⚠️ Confirm delete"
+                          : "Delete available"}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Labels inside folder */}
                 {!isCollapsed && (
