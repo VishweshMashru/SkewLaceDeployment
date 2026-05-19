@@ -29,6 +29,14 @@ function openPrint(title: string, body: string) {
   win.document.close();
 }
 
+function brandingHtml() {
+  return (
+    '<div class="brand">LybyTex</div>' +
+    '<div class="brand-url">lybytex.com</div>' +
+    '<hr class="divider" />'
+  );
+}
+
 function fgLabelHtml(opts: {
   productName: string;
   designNumber?: string | null;
@@ -37,6 +45,7 @@ function fgLabelHtml(opts: {
   quantity: number;
   id: string;
   dataUrl: string | null;
+  showBranding: boolean;
 }) {
   const sub = [
     opts.designNumber ? "Design " + opts.designNumber : null,
@@ -46,9 +55,7 @@ function fgLabelHtml(opts: {
 
   return (
     '<div class="label">' +
-    '<div class="brand">LybyTex</div>' +
-    '<div class="brand-url">lybytex.com</div>' +
-    '<hr class="divider" />' +
+    (opts.showBranding ? brandingHtml() : "") +
     '<div class="name">' + opts.productName + "</div>" +
     '<div class="sub">' + sub + "</div>" +
     (opts.dataUrl ? '<img class="qr" src="' + opts.dataUrl + '" />' : "") +
@@ -70,8 +77,40 @@ export function printFGLabel(opts: {
   id: string;
   dataUrl: string | null;
   imageUrl?: string | null;
+  showBranding?: boolean;
+  size?: "full" | "qr-only";
 }) {
-  openPrint(opts.productName + " — " + opts.id, fgLabelHtml(opts));
+  if (opts.size === "qr-only") {
+    printQROnly({ id: opts.id, productName: opts.productName, quantity: opts.quantity, dataUrl: opts.dataUrl });
+    return;
+  }
+  openPrint(
+    opts.productName + " — " + opts.id,
+    fgLabelHtml({ ...opts, showBranding: opts.showBranding ?? true })
+  );
+}
+
+function printQROnly(opts: { id: string; productName: string; quantity: number; dataUrl: string | null }) {
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(
+    "<!DOCTYPE html><html><head><title>QR — " + opts.id + "</title>" +
+    "<style>" +
+    "* { margin:0; padding:0; box-sizing:border-box; }" +
+    "html, body { background:#fff; }" +
+    "@page { size: 2in 2in; margin: 0; }" +
+    ".wrap { width:2in; height:2in; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.1in; }" +
+    ".qr { width:1.7in; height:1.7in; display:block; }" +
+    ".id { font-size:6pt; color:#94a3b8; font-family:monospace; text-align:center; margin-top:3pt; word-break:break-all; }" +
+    "</style></head><body>" +
+    "<div class='wrap'>" +
+    (opts.dataUrl ? "<img class='qr' src='" + opts.dataUrl + "' />" : "") +
+    "<div class='id'>" + opts.id + "</div>" +
+    "</div>" +
+    "<scr" + "ipt>window.onload=()=>{window.print();window.close();}</scr" + "ipt>" +
+    "</body></html>"
+  );
+  win.document.close();
 }
 
 export function printCartonLabel(opts: {
@@ -80,7 +119,35 @@ export function printCartonLabel(opts: {
   summary: { productName: string; sku: string; colorCategory?: string | null; designNumber?: string | null; totalPieces: number; imageUrl?: string | null }[];
   notes?: string | null;
   dataUrl: string | null;
+  showBranding?: boolean;
+  size?: "full" | "qr-only";
 }) {
+  if (opts.size === "qr-only") {
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(
+      "<!DOCTYPE html><html><head><title>Carton QR — " + opts.cartonNumber + "</title>" +
+      "<style>" +
+      "* { margin:0; padding:0; box-sizing:border-box; }" +
+      "html, body { background:#fff; }" +
+      "@page { size: 2in 2in; margin: 0; }" +
+      ".wrap { width:2in; height:2in; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.1in; }" +
+      ".qr { width:1.7in; height:1.7in; display:block; }" +
+      ".id { font-size:6pt; color:#94a3b8; font-family:monospace; text-align:center; margin-top:3pt; word-break:break-all; }" +
+      "</style></head><body>" +
+      "<div class='wrap'>" +
+      (opts.dataUrl ? "<img class='qr' src='" + opts.dataUrl + "' />" : "") +
+      "<div class='id'>" + opts.cartonNumber + "</div>" +
+      "</div>" +
+      "<scr" + "ipt>window.onload=()=>{window.print();window.close();}</scr" + "ipt>" +
+      "</body></html>"
+    );
+    win.document.close();
+    return;
+  }
+
+  const showBranding = opts.showBranding ?? true;
+
   const CARTON_CSS = [
     "* { margin:0; padding:0; box-sizing:border-box; }",
     "html, body { background:#fff; font-family:-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }",
@@ -113,9 +180,7 @@ export function printCartonLabel(opts: {
 
   const body = (
     '<div class="label">' +
-    '<div class="brand">LybyTex</div>' +
-    '<div class="brand-url">lybytex.com</div>' +
-    '<hr class="divider" />' +
+    (showBranding ? '<div class="brand">LybyTex</div><div class="brand-url">lybytex.com</div><hr class="divider" />' : "") +
     '<div class="tag">Carton</div>' +
     '<div class="num">' + opts.cartonNumber + "</div>" +
     (opts.dataUrl ? '<img class="qr" src="' + opts.dataUrl + '" />' : "") +
@@ -146,11 +211,44 @@ export function printBulkLabels(opts: {
   product: { name: string; sku: string; designNumber?: string | null; colorCategory?: string | null; imageUrl?: string | null };
   labels: { id: string; quantity: number }[];
   qrDataUrls: Record<string, string>;
+  showBranding?: boolean;
+  size?: "full" | "qr-only";
 }) {
+  const showBranding = opts.showBranding ?? true;
+
+  if (opts.size === "qr-only") {
+    // QR-only bulk: 2x2 grid per page
+    const win = window.open("", "_blank");
+    if (!win) return;
+    const labels = opts.labels.map((label, i) => {
+      const pageBreak = i < opts.labels.length - 1 ? ' style="page-break-after:always"' : "";
+      return (
+        "<div class='wrap'" + pageBreak + ">" +
+        (opts.qrDataUrls[label.id] ? "<img class='qr' src='" + opts.qrDataUrls[label.id] + "' />" : "") +
+        "<div class='id'>" + label.id + "</div>" +
+        "</div>"
+      );
+    }).join("");
+    win.document.write(
+      "<!DOCTYPE html><html><head><title>QR Labels</title>" +
+      "<style>" +
+      "* { margin:0; padding:0; box-sizing:border-box; }" +
+      "html,body { background:#fff; }" +
+      "@page { size: 2in 2in; margin: 0; }" +
+      ".wrap { width:2in; height:2in; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.1in; }" +
+      ".qr { width:1.7in; height:1.7in; display:block; }" +
+      ".id { font-size:6pt; color:#94a3b8; font-family:monospace; text-align:center; margin-top:3pt; word-break:break-all; }" +
+      "</style></head><body>" +
+      labels +
+      "<scr" + "ipt>window.onload=()=>{window.print();window.close();}</scr" + "ipt>" +
+      "</body></html>"
+    );
+    win.document.close();
+    return;
+  }
+
   const pages = opts.labels.map((label, i) => {
-    const pageBreak = i < opts.labels.length - 1
-      ? ' style="page-break-after:always"'
-      : "";
+    const pageBreak = i < opts.labels.length - 1 ? ' style="page-break-after:always"' : "";
     return fgLabelHtml({
       productName: opts.product.name,
       designNumber: opts.product.designNumber,
@@ -159,6 +257,7 @@ export function printBulkLabels(opts: {
       quantity: label.quantity,
       id: label.id,
       dataUrl: opts.qrDataUrls[label.id] ?? null,
+      showBranding,
     }).replace('<div class="label">', '<div class="label"' + pageBreak + '>');
   }).join("");
 

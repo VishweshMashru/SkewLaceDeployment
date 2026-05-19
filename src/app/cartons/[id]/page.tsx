@@ -6,6 +6,7 @@ import { ArrowLeft, Box, Package, Printer, ScanLine, Truck, Lock, Trash2, Chevro
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printCartonLabel } from "@/lib/print";
 import { useAppSession } from "@/components/SessionProvider";
+import PrintOptionsModal from "@/components/PrintOptionsModal";
 
 
 function PackedLabelsGrouped({ items, canEdit, cartonStatus, removingId, onRemove }: {
@@ -103,6 +104,7 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
   const [updating, setUpdating]     = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]     = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const qrRef = useRef<QRDisplayHandle>(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -153,6 +155,10 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
   }
 
   function handlePrint() {
+    setShowPrintModal(true);
+  }
+
+  function doPrint({ showBranding, size }: { showBranding: boolean; size: "full" | "qr-only" }) {
     if (!data) return;
     const { carton, summary } = data;
     printCartonLabel({
@@ -167,6 +173,8 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
       })),
       notes: carton.notes,
       dataUrl: qrRef.current?.getDataUrl() ?? null,
+      showBranding,
+      size,
     });
   }
 
@@ -188,6 +196,13 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="space-y-4">
+      {showPrintModal && (
+        <PrintOptionsModal
+          title="Print Carton Label"
+          onPrint={doPrint}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
       {/* Top bar */}
       <div className="flex items-center justify-between">
         {canEdit ? (

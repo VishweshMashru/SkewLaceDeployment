@@ -5,6 +5,7 @@ import { ArrowLeft, Printer, Layers, X, CheckCircle } from "lucide-react";
 import QRCode from "qrcode";
 import { printBulkLabels } from "@/lib/print";
 import type { Product } from "@/db/schema";
+import PrintOptionsModal from "@/components/PrintOptionsModal"
 
 interface GeneratedLabel {
   id: string;
@@ -28,6 +29,7 @@ export default function BulkPrintPage() {
   const [error, setError] = useState("");
   const [qrDataUrls, setQrDataUrls] = useState<Record<string, string>>({});
   const [renderingQrs, setRenderingQrs] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   useEffect(() => {
@@ -75,11 +77,17 @@ export default function BulkPrintPage() {
   }
 
   function handlePrint() {
+    setShowPrintModal(true);
+  }
+
+  function doPrint({ showBranding, size }: { showBranding: boolean; size: "full" | "qr-only" }) {
     if (!result) return;
     printBulkLabels({
       product: result.product,
       labels: result.created,
       qrDataUrls,
+      showBranding,
+      size,
     });
   }
 
@@ -87,6 +95,13 @@ export default function BulkPrintPage() {
 
   return (
     <div className="space-y-5">
+      {showPrintModal && (
+        <PrintOptionsModal
+          title="Print Bulk Labels"
+          onPrint={doPrint}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
       <div className="flex items-center gap-3">
         <Link href="/finished-goods" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
           <ArrowLeft size={16} /> Back

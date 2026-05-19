@@ -7,6 +7,7 @@ import { ArrowLeft, Package, Box, CheckCircle, Truck, Clock, Printer, Trash2 } f
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printFGLabel } from "@/lib/print";
 import { useAppSession } from "@/components/SessionProvider";
+import PrintOptionsModal from "@/components/PrintOptionsModal"
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
   available: { label: "Available", icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
@@ -23,6 +24,7 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
   const [notFound, setNotFound] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const qrRef = useRef<QRDisplayHandle>(null);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -37,6 +39,10 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
   }, [id]);
 
   function handlePrint() {
+    setShowPrintModal(true);
+  }
+
+  function doPrint({ showBranding, size }: { showBranding: boolean; size: "full" | "qr-only" }) {
     const dataUrl = qrRef.current?.getDataUrl() ?? null;
     if (!data) return;
     const { fg, product } = data;
@@ -49,6 +55,8 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
       id: fg.id,
       dataUrl,
       imageUrl: product?.imageUrl,
+      showBranding,
+      size,
     });
   }
 
@@ -90,6 +98,13 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-4">
+      {showPrintModal && (
+        <PrintOptionsModal
+          title="Print Label"
+          onPrint={doPrint}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
       {/* Top bar */}
       <div className="flex items-center justify-between">
         {canEdit ? (

@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printFGLabel } from "@/lib/print";
 import type { Product } from "@/db/schema";
+import PrintOptionsModal from "@/components/PrintOptionsModal";
 
 const schema = z.object({
   productId: z.string().min(1, "Select a product"),
@@ -41,6 +42,7 @@ export default function FinishedGoodsPage() {
   const [submitting, setSubmitting]   = useState(false);
   const [newItem, setNewItem]         = useState<any>(null);
   const [error, setError]             = useState("");
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [collapsed, setCollapsed]     = useState<Set<string>>(new Set());
   const [confirmDeleteProduct, setConfirmDeleteProduct] = useState<string | null>(null);
@@ -82,6 +84,10 @@ export default function FinishedGoodsPage() {
   }
 
   function handlePrint() {
+    setShowPrintModal(true);
+  }
+
+  function doPrint({ showBranding, size }: { showBranding: boolean; size: "full" | "qr-only" }) {
     if (!newItem) return;
     printFGLabel({
       productName: newItem.product?.name ?? "",
@@ -92,6 +98,8 @@ export default function FinishedGoodsPage() {
       id: newItem.id,
       dataUrl: qrRef.current?.getDataUrl() ?? null,
       imageUrl: newItem.product?.imageUrl,
+      showBranding,
+      size,
     });
   }
 
@@ -148,6 +156,13 @@ export default function FinishedGoodsPage() {
 
   return (
     <div className="space-y-4">
+      {showPrintModal && (
+        <PrintOptionsModal
+          title="Print Label"
+          onPrint={doPrint}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-slate-800">Labels</h1>
