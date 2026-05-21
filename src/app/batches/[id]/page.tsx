@@ -80,7 +80,7 @@ export default function BatchDetailPage({ params }: { params: Promise<{ id: stri
     // Only show cartons not already in this batch and not dispatched
     const batchCartonIds = new Set((data?.cartons ?? []).map((c: any) => c.id));
     setAvailableCartons(
-      (Array.isArray(all) ? all : []).filter((c: any) => !batchCartonIds.has(c.id) && c.status !== "dispatched")
+      (Array.isArray(all) ? all : []).filter((c: any) => !batchCartonIds.has(c.id) && c.status !== "dispatched" && !c.batchId)
     );
     setLoadingCartons(false);
   }
@@ -98,7 +98,7 @@ export default function BatchDetailPage({ params }: { params: Promise<{ id: stri
     const all = await res.json();
     const batchCartonIds = new Set((data?.cartons ?? []).map((c: any) => c.id));
     setAvailableCartons(
-      (Array.isArray(all) ? all : []).filter((c: any) => !batchCartonIds.has(c.id) && c.status !== "dispatched")
+      (Array.isArray(all) ? all : []).filter((c: any) => !batchCartonIds.has(c.id) && c.status !== "dispatched" && !c.batchId)
     );
     setAssigningId(null);
   }
