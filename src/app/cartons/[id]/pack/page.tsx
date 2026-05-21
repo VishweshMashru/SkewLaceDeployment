@@ -6,6 +6,31 @@ import QRScanner from "@/components/QRScanner";
 
 type InputMode = "browse" | "camera" | "manual";
 
+function QuickAdd({ max, onAdd, adding }: { max: number; onAdd: (n: number) => void; adding: boolean }) {
+  const [val, setVal] = useState("");
+  const n = parseInt(val);
+  const valid = !isNaN(n) && n > 0 && n <= max;
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+      <span className="text-xs text-slate-500 flex-shrink-0">Add first</span>
+      <input
+        type="number" min={1} max={max} value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => e.key === "Enter" && valid && onAdd(n)}
+        placeholder={`1–${max}`}
+        className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      />
+      <span className="text-xs text-slate-400 flex-shrink-0">labels</span>
+      <button
+        onClick={() => valid && onAdd(n)}
+        disabled={!valid || adding}
+        className="ml-auto text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-40 hover:bg-blue-700 transition-colors flex-shrink-0">
+        {adding ? "…" : "Add"}
+      </button>
+    </div>
+  );
+}
+
 interface LabelRow { fg: any; product: any; }
 
 interface ProductGroup {
@@ -279,6 +304,15 @@ export default function PackCartonPage({ params }: { params: Promise<{ id: strin
                       {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                     </button>
                   </div>
+
+                  {/* Quick-add by number */}
+                  {group.available.length > 0 && (
+                    <QuickAdd
+                      max={group.available.length}
+                      onAdd={(n) => bulkAdd(group.available.slice(0, n).map(r => r.fg.id))}
+                      adding={bulkAdding}
+                    />
+                  )}
 
                   {/* Labels list */}
                   {!isCollapsed && (
