@@ -206,18 +206,36 @@ export default function BatchDetailPage({ params }: { params: Promise<{ id: stri
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
             Cartons ({cartons.length})
           </h2>
-          {canEdit && batch.status === "preparing" && (
-            <button
-              onClick={() => {
-                const next = !showAddCarton;
-                setShowAddCarton(next);
-                if (next) { setAddMode("new"); fetchAvailableCartons(); }
-              }}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
-              {showAddCarton ? <X size={12} /> : <Plus size={12} />}
-              {showAddCarton ? "Cancel" : "Add Carton"}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {canEdit && batch.status === "preparing" && cartons.length > 0 && (
+              <button
+                onClick={async () => {
+                  for (const c of cartons) {
+                    await fetch(`/api/cartons/${c.id}/assign-batch`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ batchId: null }),
+                    });
+                  }
+                  fetchData();
+                }}
+                className="text-xs text-red-500 hover:text-red-700 font-medium">
+                Remove All
+              </button>
+            )}
+            {canEdit && batch.status === "preparing" && (
+              <button
+                onClick={() => {
+                  const next = !showAddCarton;
+                  setShowAddCarton(next);
+                  if (next) { setAddMode("new"); fetchAvailableCartons(); }
+                }}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                {showAddCarton ? <X size={12} /> : <Plus size={12} />}
+                {showAddCarton ? "Cancel" : "Add Carton"}
+              </button>
+            )}
+          </div>
         </div>
 
         {showAddCarton && (
@@ -253,20 +271,33 @@ export default function BatchDetailPage({ params }: { params: Promise<{ id: stri
                 ) : availableCartons.length === 0 ? (
                   <p className="text-xs text-slate-400 text-center py-3">No available cartons to assign</p>
                 ) : (
-                  availableCartons.map(c => (
-                    <div key={c.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                      <div>
-                        <p className="text-sm font-mono font-semibold text-slate-800">{c.cartonNumber}</p>
-                        <p className="text-xs text-slate-400">{c.totalPieces} pcs · {c.status}{c.notes ? " · " + c.notes : ""}</p>
-                      </div>
+                  <>
+                    {/* Select all / Assign all */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <span className="text-xs text-slate-500">{availableCartons.length} cartons available</span>
                       <button
-                        onClick={() => assignCarton(c.id)}
-                        disabled={assigningId === c.id}
-                        className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60">
-                        {assigningId === c.id ? "…" : "Assign"}
+                        onClick={async () => {
+                          for (const c of availableCartons) await assignCarton(c.id);
+                        }}
+                        className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                        Assign All
                       </button>
                     </div>
-                  ))
+                    {availableCartons.map(c => (
+                      <div key={c.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                        <div>
+                          <p className="text-sm font-mono font-semibold text-slate-800">{c.cartonNumber}</p>
+                          <p className="text-xs text-slate-400">{c.totalPieces} pcs · {c.status}{c.notes ? " · " + c.notes : ""}</p>
+                        </div>
+                        <button
+                          onClick={() => assignCarton(c.id)}
+                          disabled={assigningId === c.id}
+                          className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60">
+                          {assigningId === c.id ? "…" : "Assign"}
+                        </button>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             )}

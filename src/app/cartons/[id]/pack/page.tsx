@@ -47,7 +47,7 @@ export default function PackCartonPage({ params }: { params: Promise<{ id: strin
     const data = await res.json();
     const rows: LabelRow[] = Array.isArray(data) ? data : [];
 
-    // Group by product
+    // Group by product - deduplicate properly
     const map = new Map<string, ProductGroup>();
     for (const row of rows) {
       const pid = row.fg.productId;
@@ -260,6 +260,7 @@ export default function PackCartonPage({ params }: { params: Promise<{ id: strin
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-800 text-sm truncate">{group.productName}</p>
                       <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs font-mono text-blue-600">{group.sku}</span>
                         <span className="text-xs text-emerald-600 font-medium">{group.available.length} available</span>
                         {group.packed.length > 0 && <span className="text-xs text-slate-400">{group.packed.length} packed</span>}
                       </div>
