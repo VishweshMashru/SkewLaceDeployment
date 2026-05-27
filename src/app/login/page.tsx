@@ -37,7 +37,7 @@ function LoginForm() {
           <div className="inline-flex items-center gap-2 text-blue-600 font-bold text-2xl mb-1">
             <Box size={28} /> CartonTrack
           </div>
-          <p className="text-slate-500 text-sm">by LybyTex</p>
+          <p className="text-slate-500 text-sm">by Aurex Labs</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <h1 className="text-lg font-bold text-slate-800 mb-5">Sign in</h1>
