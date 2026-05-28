@@ -14,7 +14,6 @@ export const cartonStatusEnum = pgEnum("carton_status", [
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "staff", "viewer"]);
 
-// Simple users table for NextAuth credentials
 export const appUsers = pgTable("app_users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -58,11 +57,12 @@ export const finishedGoods = pgTable("finished_goods", {
   productId: text("product_id")
     .notNull()
     .references(() => products.id),
-  trackingType: text("tracking_type").notNull(), // "piece" | "dozen" | "manual"
+  trackingType: text("tracking_type").notNull(),
   quantity: integer("quantity").notNull(),
   status: finishedGoodsStatusEnum("status").default("available").notNull(),
   cartonId: text("carton_id").references(() => cartons.id),
-  label: text("label"), // display label e.g. "Kaftan Design 142 - 12 pcs"
+  orderLineId: text("order_line_id"), // links label to an order line
+  label: text("label"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -76,9 +76,51 @@ export const cartons = pgTable("cartons", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Orders system
+export const orderTypeEnum = pgEnum("order_type", ["production", "purchase"]);
+export const orderStatusEnum = pgEnum("order_status", ["open", "in_progress", "completed", "cancelled"]);
+export const orderLineStatusEnum = pgEnum("order_line_status", ["pending", "in_progress", "completed"]);
+
+export const orders = pgTable("orders", {
+  id: text("id").primaryKey(),
+  type: orderTypeEnum("type").default("production").notNull(),
+  status: orderStatusEnum("status").default("open").notNull(),
+  buyerName: text("buyer_name"),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  batchId: text("batch_id").references(() => batches.id),
+  orderDate: timestamp("order_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const orderLines = pgTable("order_lines", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id),
+  productName: text("product_name").notNull(), // denormalized for display
+  colorCategory: text("color_category"),
+  designNumber: text("design_number"),
+  targetQty: integer("target_qty").notNull(),
+  actualQty: integer("actual_qty").default(0).notNull(),
+  status: orderLineStatusEnum("status").default("pending").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 export type FinishedGoods = typeof finishedGoods.$inferSelect;
 export type NewFinishedGoods = typeof finishedGoods.$inferInsert;
 export type Carton = typeof cartons.$inferSelect;
 export type NewCarton = typeof cartons.$inferInsert;
+export type Order = typeof orders.$inferSelect;
+export type OrderLine = typeof orderLines.$inferSelect;
+
+// Relations for drizzle queries
+import { relations } from "drizzle-orm";
+export const ordersRelations = relations(orders, ({ many }) => ({
+  lines: many(orderLines),
+}));
+export const orderLinesRelations = relations(orderLines, ({ one }) => ({
+  order: one(orders, { fields: [orderLines.orderId], references: [orders.id] }),
+}));

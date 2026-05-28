@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, X, Trash2, ImagePlus, Loader2, Pencil, Check, Search, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { Plus, X, Trash2, ImagePlus, Loader2, Pencil, Check, Search, ChevronDown, ChevronUp, Package, Camera, ScanLine } from "lucide-react";
 import { useAppSession } from "@/components/SessionProvider";
 import { uploadImage } from "@/lib/upload";
 
@@ -166,6 +166,54 @@ function ProductGroup({ name, products, canEdit, canDelete, onUpdated, onDeleted
   );
 }
 
+function ScannedProductRow({ item, isCreated, isCreating, onCreate }: {
+  item: any; isCreated: boolean; isCreating: boolean; onCreate: () => void;
+}) {
+  const [name, setName]         = useState(item.name);
+  const [color, setColor]       = useState(item.colorCategory || "");
+  const [design, setDesign]     = useState(item.designNumber || "");
+  const [qty, setQty]           = useState(item.quantity || 0);
+
+  if (isCreated) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50">
+        <Check size={16} className="text-emerald-600 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-emerald-800">{name}</p>
+          <p className="text-xs text-emerald-600">{color}</p>
+        </div>
+        <span className="text-xs text-emerald-500">Created</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 py-3 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <input value={name} onChange={e => setName(e.target.value)}
+          placeholder="Product name"
+          className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+        <input value={color} onChange={e => setColor(e.target.value)}
+          placeholder="Color / Category"
+          className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+        <input value={design} onChange={e => setDesign(e.target.value)}
+          placeholder="Design #"
+          className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+        <div className="flex items-center gap-2">
+          <input type="number" value={qty} onChange={e => setQty(parseInt(e.target.value) || 0)}
+            placeholder="Qty"
+            className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+          <button onClick={() => { item.name = name; item.colorCategory = color; item.designNumber = design; onCreate(); }}
+            disabled={isCreating || !name.trim()}
+            className="flex-shrink-0 bg-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
+            {isCreating ? <Loader2 size={13} className="animate-spin" /> : "Add"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const [products, setProducts]         = useState<any[]>([]);
   const [showForm, setShowForm]         = useState(false);
@@ -173,6 +221,13 @@ export default function ProductsPage() {
   const [submitting, setSubmitting]     = useState(false);
   const [error, setError]               = useState("");
   const [search, setSearch]             = useState("");
+  const [scanning, setScanning]         = useState(false);
+  const [scanResults, setScanResults]   = useState<any[] | null>(null);
+  const [scanError, setScanError]       = useState("");
+  const [creating, setCreating]         = useState<Record<number, boolean>>({});
+  const [created, setCreated]           = useState<Set<number>>(new Set());
+  const [creatingAll, setCreatingAll]   = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
   const [imageFile, setImageFile]       = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading]       = useState(false);
@@ -207,7 +262,52 @@ export default function ProductsPage() {
     finally { setSubmitting(false); setUploading(false); }
   }
 
-  // Filter by search
+  async function handleScanImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanning(true); setScanError(""); setScanResults(null);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/scan-products", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scan failed");
+      setScanResults(data.products);
+    } catch (e: any) { setScanError(e.message); }
+    finally { setScanning(false); if (scanInputRef.current) scanInputRef.current.value = ""; }
+  }
+
+  async function createScannedProduct(item: any, idx: number) {
+    setCreating(prev => ({ ...prev, [idx]: true }));
+    try {
+      // Generate a SKU from name + color initials
+      const namePart = item.name.replace(/\s+/g, "").slice(0, 4).toUpperCase();
+      const colorPart = (item.colorCategory || "").replace(/\s+/g, "").slice(0, 4).toUpperCase();
+      const sku = namePart + (colorPart ? "-" + colorPart : "") + "-" + Date.now().toString(36).slice(-3).toUpperCase();
+      
+      await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: item.name,
+          sku,
+          colorCategory: item.colorCategory || "",
+          designNumber: item.designNumber || "",
+        }),
+      });
+      setCreated(prev => new Set(prev).add(idx));
+      fetchProducts();
+    } finally { setCreating(prev => ({ ...prev, [idx]: false })); }
+  }
+
+  async function createAllScanned() {
+    if (!scanResults) return;
+    setCreatingAll(true);
+    for (let i = 0; i < scanResults.length; i++) {
+      if (!created.has(i)) await createScannedProduct(scanResults[i], i);
+    }
+    setCreatingAll(false);
+  }
   const q = search.toLowerCase();
   const filtered = products.filter(p =>
     !q ||
@@ -230,14 +330,65 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-800">Products / SKUs</h1>
+      <div className="flex items-center gap-2">
         {canEdit && (
-          <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
-            {showForm ? <X size={16} /> : <Plus size={16} />}
-            {showForm ? "Cancel" : "New Product"}
-          </button>
+          <>
+            <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
+              className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
+              {scanning ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
+              {scanning ? "Scanning…" : "Scan Sheet"}
+            </button>
+            <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScanImage} className="hidden" />
+            <button onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+              {showForm ? <X size={16} /> : <Plus size={16} />}
+              {showForm ? "Cancel" : "New"}
+            </button>
+          </>
         )}
       </div>
+      </div>
+
+      {/* Scan error */}
+      {scanError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center justify-between">
+          {scanError}
+          <button onClick={() => setScanError("")}><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Scan results */}
+      {scanResults && (
+        <div className="bg-white rounded-2xl border-2 border-violet-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-violet-50 border-b border-violet-100">
+            <div>
+              <p className="font-semibold text-violet-800 text-sm">
+                ✓ Found {scanResults.length} products
+              </p>
+              <p className="text-xs text-violet-500 mt-0.5">Review and create — edit SKU or name before saving</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={createAllScanned} disabled={creatingAll || created.size === scanResults.length}
+                className="text-xs bg-violet-600 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
+                {creatingAll ? "Creating…" : created.size === scanResults.length ? "All created ✓" : `Create All (${scanResults.length - created.size})`}
+              </button>
+              <button onClick={() => { setScanResults(null); setCreated(new Set()); }}
+                className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {scanResults.map((item, idx) => (
+              <ScannedProductRow
+                key={idx}
+                item={item}
+                isCreated={created.has(idx)}
+                isCreating={!!creating[idx]}
+                onCreate={() => createScannedProduct(item, idx)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">

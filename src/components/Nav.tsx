@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Package, Box, QrCode, Search, BarChart3, LogOut, ShieldCheck, Archive } from "lucide-react";
+import { Package, Box, QrCode, Search, BarChart3, LogOut, ShieldCheck, Archive, ClipboardList, LayoutDashboard } from "lucide-react";
 import { useAppSession } from "./SessionProvider";
 import { signOut } from "next-auth/react";
 
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/finished-goods", label: "Labels",    icon: QrCode    },
   { href: "/cartons",        label: "Cartons",   icon: Box       },
   { href: "/batches",   label: "Batches",   icon: Archive  },
+  { href: "/orders", label: "Orders", icon: ClipboardList },
   { href: "/search",    label: "Search",    icon: Search   },
 ];
 
