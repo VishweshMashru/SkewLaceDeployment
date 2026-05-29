@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Box, X, Trash2, ChevronDown, ChevronUp, Warehouse, Truck, MapPin } from "lucide-react";
+import { Plus, Box, X, Trash2, ChevronDown, ChevronUp, Warehouse, Truck, MapPin, Printer } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const schema = z.object({
@@ -127,15 +128,21 @@ export default function CartonsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-800">Cartons</h1>
+        <div className="flex items-center gap-2">
+        <Link href="/cartons/print-queue"
+          className="flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">
+          <Printer size={15} /> Print Queue
+        </Link>
         <button onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors">
           {showForm ? <X size={16} /> : <Plus size={16} />}
           {showForm ? "Cancel" : "New Carton"}
         </button>
       </div>
+      </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-2 bg-white border border-slate-200 rounded-2xl p-1 overflow-x-auto">
+      <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1 overflow-x-auto">
         {([
           ["all",        "All",       counts.all],
           ["open",       "Open",      counts.open],
@@ -144,7 +151,7 @@ export default function CartonsPage() {
           ["storage",    "Storage",   counts.storage],
         ] as [StatusFilter, string, number][]).map(([key, label, count]) => (
           <button key={key} onClick={() => setStatusFilter(key)}
-            className={`flex-shrink-0 px-7 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+            className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
               statusFilter === key ? "bg-violet-600 text-white" : "text-slate-500 hover:bg-slate-50"
             }`}>
             {label} ({count})

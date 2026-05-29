@@ -2,11 +2,155 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Box, Package, Printer, ScanLine, Truck, Lock, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Box, Package, Printer, ScanLine, Truck, Lock, Trash2, ChevronDown, ChevronUp, Warehouse, MapPin, Pencil, Check, X } from "lucide-react";
 import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
 import { printCartonLabel } from "@/lib/print";
 import { useAppSession } from "@/components/SessionProvider";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
+
+function EditCartonSection({ carton, cartonId, onUpdated }: { carton: any; cartonId: string; onUpdated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState(carton.notes ?? "");
+  const [location, setLocation] = useState(carton.storageLocation ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    await fetch(`/api/cartons/${cartonId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes, storageLocation: location }),
+    });
+    setSaving(false);
+    setOpen(false);
+    onUpdated();
+  }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)}
+      className="w-full flex items-center justify-center gap-2 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+      <Pencil size={15} /> Edit Carton Details
+    </button>
+  );
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-slate-700 text-sm">Edit Carton</h2>
+        <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-slate-600 block mb-1">Notes</label>
+        <input value={notes} onChange={e => setNotes(e.target.value)}
+          placeholder="e.g. JDT order, 22kg"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      {carton.purpose === "storage" && (
+        <div>
+          <label className="text-xs font-medium text-slate-600 block mb-1">Storage Location</label>
+          <input value={location} onChange={e => setLocation(e.target.value)}
+            placeholder="e.g. Rack B-3"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      )}
+      <button onClick={save} disabled={saving}
+        className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-60">
+        <Check size={15} /> {saving ? "Saving…" : "Save Changes"}
+      </button>
+    </div>
+  );
+}
+
+function MassDeleteSection({ items, cartonId, onDeleted }: { items: any[]; cartonId: string; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [count, setCount] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
+  // Group items by product
+  const productGroups = new Map<string, { name: string; color: string | null; items: any[] }>();
+  for (const item of items) {
+    const pid = item.fg.productId;
+    if (!productGroups.has(pid)) {
+      productGroups.set(pid, {
+        name: item.product?.name ?? "Unknown",
+        color: item.product?.colorCategory ?? null,
+        items: [],
+      });
+    }
+    productGroups.get(pid)!.items.push(item);
+  }
+
+  const selectedGroup = productGroups.get(selectedProduct);
+  const maxCount = selectedGroup?.items.length ?? 0;
+  const n = parseInt(count);
+  const valid = selectedProduct && !isNaN(n) && n > 0 && n <= maxCount;
+
+  async function handleMassDelete() {
+    if (!confirm) { setConfirm(true); return; }
+    if (!valid || !selectedGroup) return;
+    setDeleting(true);
+    // Delete the last N items (most recently added)
+    const toDelete = selectedGroup.items.slice(-n).map((i: any) => i.fg.id);
+    for (const fgId of toDelete) {
+      await fetch(`/api/cartons/${cartonId}/remove-item`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ finishedGoodsId: fgId }),
+      });
+    }
+    setDeleting(false);
+    setConfirm(false);
+    setCount("");
+    onDeleted();
+  }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)}
+      className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-500 py-2.5 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
+      <Trash2 size={15} /> Mass Remove from Carton
+    </button>
+  );
+
+  return (
+    <div className="bg-white rounded-2xl border border-red-200 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-red-700 text-sm">Mass Remove</h2>
+        <button onClick={() => { setOpen(false); setConfirm(false); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-slate-600 block mb-1">Product</label>
+        <select value={selectedProduct} onChange={e => { setSelectedProduct(e.target.value); setCount(""); setConfirm(false); }}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
+          <option value="">Select product…</option>
+          {Array.from(productGroups.entries()).map(([pid, g]) => (
+            <option key={pid} value={pid}>{g.name}{g.color ? " – " + g.color : ""} ({g.items.length} labels)</option>
+          ))}
+        </select>
+      </div>
+      {selectedProduct && (
+        <div>
+          <label className="text-xs font-medium text-slate-600 block mb-1">
+            How many labels to remove? (max {maxCount})
+          </label>
+          <input type="number" value={count} onChange={e => { setCount(e.target.value); setConfirm(false); }}
+            min={1} max={maxCount} placeholder={`1–${maxCount}`}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          {valid && <p className="text-xs text-slate-400 mt-1">Will remove the {n} most recently added labels</p>}
+        </div>
+      )}
+      <button onClick={handleMassDelete} disabled={!valid || deleting}
+        className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium disabled:opacity-60 transition-colors ${
+          confirm ? "bg-red-600 text-white" : "bg-red-50 text-red-600 hover:bg-red-100"
+        }`}>
+        <Trash2 size={15} />
+        {deleting ? "Removing…" : confirm ? `⚠️ Confirm — remove ${n} labels` : `Remove ${valid ? n + " labels" : "…"}`}
+      </button>
+      {confirm && <button onClick={() => setConfirm(false)} className="w-full text-xs text-slate-400 hover:text-slate-600">Cancel</button>}
+    </div>
+  );
+}
 
 
 function PackedLabelsGrouped({ items, canEdit, cartonStatus, removingId, onRemove }: {
@@ -230,11 +374,20 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* Status bar */}
-      <div className={`rounded-2xl border-2 p-4 flex items-center gap-3 ${statusColors[carton.status]}`}>
-        <Box size={24} />
-        <div>
+      <div className={`rounded-2xl border-2 p-4 flex items-center gap-3 ${carton.purpose === "storage" ? "bg-emerald-50 border-emerald-300 text-emerald-800" : statusColors[carton.status]}`}>
+        {carton.purpose === "storage" ? <Warehouse size={24} /> : <Box size={24} />}
+        <div className="flex-1 min-w-0">
           <p className="font-bold text-slate-800 font-mono text-lg">{carton.cartonNumber}</p>
-          <span className="text-xs font-medium capitalize">{carton.status}</span>
+          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+            <span className="text-xs font-medium capitalize">
+              {carton.purpose === "storage" ? "📦 Storage" : `🚚 Dispatch · ${carton.status}`}
+            </span>
+            {carton.storageLocation && (
+              <span className="text-xs flex items-center gap-0.5 text-emerald-700">
+                <MapPin size={10} /> {carton.storageLocation}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -298,6 +451,26 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
         />
       )}
 
+      {/* Packing List */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+        <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Packing List</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <a href={`/api/cartons/${id}/packing-list?mode=summary`} target="_blank"
+            className="flex items-center justify-center gap-2 border border-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+            <Printer size={15} /> Summary PDF
+          </a>
+          <a href={`/api/cartons/${id}/packing-list?mode=detailed`} target="_blank"
+            className="flex items-center justify-center gap-2 border border-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+            <Printer size={15} /> Detailed PDF
+          </a>
+        </div>
+      </div>
+
+      {/* Edit carton */}
+      {canEdit && carton.status !== "dispatched" && (
+        <EditCartonSection carton={carton} cartonId={id} onUpdated={fetchData} />
+      )}
+
       {/* Actions — staff/admin only */}
       {canEdit && carton.status !== "dispatched" && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
@@ -307,6 +480,10 @@ export default function CartonDetailPage({ params }: { params: Promise<{ id: str
               className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
               <ScanLine size={18} /> Add Items to Carton
             </Link>
+          )}
+          {/* Mass delete inside actions */}
+          {items.length > 0 && (
+            <MassDeleteSection items={items} cartonId={id} onDeleted={fetchData} />
           )}
           {carton.status === "open" && (
             <button onClick={() => updateStatus("sealed")} disabled={updating}

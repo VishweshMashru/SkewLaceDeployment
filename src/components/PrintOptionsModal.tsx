@@ -64,8 +64,8 @@ export default function PrintOptionsModal({ onPrint, onClose, title = "Print Lab
                 <Building2 size={16} className="text-blue-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-800">LybyTex Branding</p>
-                <p className="text-xs text-slate-500">Show name and lybytex.com</p>
+                <p className="text-sm font-medium text-slate-800">{process.env.NEXT_PUBLIC_BRAND_NAME ?? "Brand"} Branding</p>
+                <p className="text-xs text-slate-500">Show name{process.env.NEXT_PUBLIC_BRAND_URL ? " and " + process.env.NEXT_PUBLIC_BRAND_URL : ""}</p>
               </div>
             </div>
             <button onClick={() => setShowBranding(!showBranding)}

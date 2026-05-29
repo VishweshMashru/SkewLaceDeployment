@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 
 const bulkSchema = z.object({
   productId: z.string().min(1),
-  count: z.number().int().min(1).max(200),
+  count: z.number().int().min(1).max(9999),
   trackingType: z.enum(["piece", "dozen", "manual"]),
   quantity: z.number().int().positive(),
 });

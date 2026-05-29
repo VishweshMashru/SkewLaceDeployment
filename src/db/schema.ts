@@ -49,6 +49,9 @@ export const products = pgTable("products", {
   designNumber: text("design_number"),
   colorCategory: text("color_category"),
   imageUrl: text("image_url"),
+  metersPerPiece: text("meters_per_piece"),
+  size: text("size"),
+  rate: text("rate"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

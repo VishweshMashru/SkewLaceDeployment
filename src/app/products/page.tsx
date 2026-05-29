@@ -9,9 +9,12 @@ import { uploadImage } from "@/lib/upload";
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
-  sku: z.string().min(1, "Required"),
+  sku: z.string().optional(),
   designNumber: z.string().optional(),
   colorCategory: z.string().optional(),
+  metersPerPiece: z.string().optional(),
+  size: z.string().optional(),
+  rate: z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -29,7 +32,14 @@ function ProductRow({ p, canEdit, canDelete, onUpdated, onDeleted }: {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, reset } = useForm<FormData>({
-    defaultValues: { name: p.name, sku: p.sku, designNumber: p.designNumber ?? "", colorCategory: p.colorCategory ?? "" },
+    defaultValues: {
+      name: p.name, sku: p.sku,
+      designNumber: p.designNumber ?? "",
+      colorCategory: p.colorCategory ?? "",
+      metersPerPiece: p.metersPerPiece ?? "",
+      size: p.size ?? "",
+      rate: p.rate ?? "",
+    },
   });
 
   function handleImg(e: React.ChangeEvent<HTMLInputElement>) {
@@ -78,12 +88,16 @@ function ProductRow({ p, canEdit, canDelete, onUpdated, onDeleted }: {
         <input {...register("name")} placeholder="Product name"
           className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         <div className="grid grid-cols-2 gap-2">
-          <input {...register("sku")} placeholder="SKU"
+          <input {...register("designNumber")} placeholder="Design # (D.NO)"
             className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
-          <input {...register("designNumber")} placeholder="Design #"
+          <input {...register("colorCategory")} placeholder="Color / Category"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          <input {...register("metersPerPiece")} placeholder="Meters/piece (MTS)"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          <input {...register("size")} placeholder="Size (e.g. 25mm)"
             className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         </div>
-        <input {...register("colorCategory")} placeholder="Color / Category"
+        <input {...register("rate")} placeholder="Rate ₹ (private, not on QR)"
           className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
         <div className="flex gap-2">
           <button type="submit" disabled={saving}
@@ -107,9 +121,11 @@ function ProductRow({ p, canEdit, canDelete, onUpdated, onDeleted }: {
         </div>
       )}
       <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{p.sku}</span>
-        {p.designNumber && <span className="text-xs text-slate-500">D{p.designNumber}</span>}
+        {p.designNumber && <span className="text-xs text-slate-500">D.NO {p.designNumber}</span>}
         {p.colorCategory && <span className="text-xs text-slate-600">{p.colorCategory}</span>}
+        {p.metersPerPiece && <span className="text-xs text-slate-400">MTS {p.metersPerPiece}</span>}
+        {p.size && <span className="text-xs text-slate-400">{p.size}</span>}
+        {p.rate && <span className="text-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">₹{p.rate}</span>}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         {canEdit && (
@@ -432,25 +448,35 @@ export default function ProductsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Product Name *</label>
-                <input {...register("name")} placeholder="e.g. Kaftan Design 142"
+                <input {...register("name")} placeholder="e.g. Jari Lace"
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">SKU *</label>
-                <input {...register("sku")} placeholder="e.g. KFT-142"
+                <label className="block text-xs font-medium text-slate-600 mb-1">Design # (D.NO)</label>
+                <input {...register("designNumber")} placeholder="e.g. 142"
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {errors.sku && <p className="text-red-500 text-xs mt-1">{errors.sku.message}</p>}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Design #</label>
-                <input {...register("designNumber")} placeholder="e.g. 01"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Color / Category</label>
                 <input {...register("colorCategory")} placeholder="e.g. Black to Gold"
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Meters/Piece (MTS)</label>
+                <input {...register("metersPerPiece")} placeholder="e.g. 1.5"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Size</label>
+                <input {...register("size")} placeholder="e.g. 25mm, 2 inch"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-slate-600 mb-1">Rate / Price (₹)</label>
+                <input {...register("rate")} placeholder="e.g. 45.00 (not shown on QR)"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <p className="text-xs text-slate-400 mt-1">Price is private — never shown on QR labels</p>
               </div>
             </div>
             {error && <p className="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}

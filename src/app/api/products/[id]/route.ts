@@ -10,6 +10,9 @@ const updateSchema = z.object({
   designNumber: z.string().nullable().optional(),
   colorCategory: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  metersPerPiece: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  rate: z.string().nullable().optional(),
 });
 
 export async function PATCH(

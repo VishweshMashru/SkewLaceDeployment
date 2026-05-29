@@ -5,7 +5,7 @@ import { ArrowLeft, Printer, Layers, X, CheckCircle } from "lucide-react";
 import QRCode from "qrcode";
 import { printBulkLabels } from "@/lib/print";
 import type { Product } from "@/db/schema";
-import PrintOptionsModal from "@/components/PrintOptionsModal"
+import PrintOptionsModal from "@/components/PrintOptionsModal";
 
 interface GeneratedLabel {
   id: string;
@@ -62,7 +62,7 @@ export default function BulkPrintPage() {
   async function handleGenerate() {
     if (!productId) { setError("Select a product"); return; }
     const n = parseInt(count);
-    if (!n || n < 1 || n > 200) { setError("Count must be 1–200"); return; }
+    if (!n || n < 1) { setError("Enter a valid count"); return; }
     setGenerating(true); setError(""); setResult(null); setQrDataUrls({});
     try {
       const res = await fetch("/api/finished-goods/bulk", {
@@ -168,7 +168,7 @@ export default function BulkPrintPage() {
               value={count}
               onChange={e => setCount(e.target.value)}
               min={1}
-              max={200}
+              max={9999}
               className="w-32 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {selectedProduct && count && (

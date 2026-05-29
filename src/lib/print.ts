@@ -50,12 +50,16 @@ function fgLabelHtml(opts: {
   id: string;
   dataUrl: string | null;
   showBranding: boolean;
+  metersPerPiece?: string | null;
+  size?: string | null;
 }) {
-  const sub = [
-    opts.designNumber ? "Design " + opts.designNumber : null,
+  const subParts = [
+    opts.designNumber ? "D.NO " + opts.designNumber : null,
     opts.colorCategory ?? null,
-    opts.sku ?? null,
-  ].filter(Boolean).join(" · ");
+    opts.metersPerPiece ? "MTS " + opts.metersPerPiece : null,
+    opts.size ?? null,
+  ].filter(Boolean);
+  const sub = subParts.join(" · ");
 
   return (
     '<div class="label">' +
@@ -83,6 +87,8 @@ export function printFGLabel(opts: {
   imageUrl?: string | null;
   showBranding?: boolean;
   size?: "full" | "qr-only";
+  metersPerPiece?: string | null;
+  productSize?: string | null;
 }) {
   if (opts.size === "qr-only") {
     printQROnly({ id: opts.id, productName: opts.productName, quantity: opts.quantity, dataUrl: opts.dataUrl });
@@ -90,7 +96,11 @@ export function printFGLabel(opts: {
   }
   openPrint(
     opts.productName + " — " + opts.id,
-    fgLabelHtml({ ...opts, showBranding: opts.showBranding ?? true })
+    fgLabelHtml({
+      ...opts,
+      size: opts.productSize,
+      showBranding: opts.showBranding ?? true,
+    })
   );
 }
 
