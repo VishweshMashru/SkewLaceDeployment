@@ -1,345 +1,381 @@
 "use client";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Box, Package, Printer, ScanLine, Truck, Lock, Trash2, ChevronDown, ChevronUp, Warehouse, MapPin } from "lucide-react";
-import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
-import { printCartonLabel } from "@/lib/print";
-import { useAppSession } from "@/components/SessionProvider";
-import PrintOptionsModal from "@/components/PrintOptionsModal";
+import { ArrowLeft, CheckCircle, AlertCircle, Package, Camera, Keyboard, ChevronDown, ChevronUp, Check } from "lucide-react";
+import QRScanner from "@/components/QRScanner";
 
+type InputMode = "browse" | "camera" | "manual";
 
-function PackedLabelsGrouped({ items, canEdit, cartonStatus, removingId, onRemove }: {
-  items: any[];
-  canEdit: boolean;
-  cartonStatus: string;
-  removingId: string | null;
-  onRemove: (id: string) => void;
-}) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-
-  // Group by product
-  const groups: { productId: string; productName: string; imageUrl: string | null; items: any[] }[] = [];
-  const seen = new Map<string, number>();
-  for (const item of items) {
-    const pid = item.fg.productId;
-    if (!seen.has(pid)) {
-      seen.set(pid, groups.length);
-      groups.push({ productId: pid, productName: item.product?.name ?? "Unknown", imageUrl: item.product?.imageUrl ?? null, items: [] });
-    }
-    groups[seen.get(pid)!].items.push(item);
-  }
-
-  function toggle(pid: string) {
-    setCollapsed(prev => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
-  }
-
-  const totalPieces = items.reduce((s, i) => s + i.fg.quantity, 0);
-
+function QuickAdd({ max, onAdd, adding }: { max: number; onAdd: (n: number) => void; adding: boolean }) {
+  const [val, setVal] = useState("");
+  const n = parseInt(val);
+  const valid = !isNaN(n) && n > 0 && n <= max;
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Packed Labels</h2>
-        <span className="text-xs text-slate-400">{items.length} labels · {totalPieces} pcs</span>
-      </div>
-      {groups.map(group => {
-        const isCollapsed = collapsed.has(group.productId);
-        const groupPieces = group.items.reduce((s: number, i: any) => s + i.fg.quantity, 0);
-        return (
-          <div key={group.productId} className="border-b border-slate-100 last:border-0">
-            <button onClick={() => toggle(group.productId)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
-              {group.imageUrl ? (
-                <img src={group.imageUrl} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" alt="" />
-              ) : (
-                <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Package size={14} className="text-emerald-600" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">{group.productName}</p>
-                <p className="text-xs text-slate-400">{group.items.length} labels · {groupPieces} pcs</p>
-              </div>
-              {isCollapsed ? <ChevronDown size={15} className="text-slate-400 flex-shrink-0" /> : <ChevronUp size={15} className="text-slate-400 flex-shrink-0" />}
-            </button>
-            {!isCollapsed && (
-              <div className="divide-y divide-slate-50 bg-slate-50/50">
-                {group.items.map((item: any) => (
-                  <div key={item.fg.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <Link href={`/finished-goods/${item.fg.id}`}
-                      className="flex-1 min-w-0 flex items-center gap-2 hover:opacity-70 transition-opacity">
-                      <span className="text-xs text-slate-500 font-mono truncate">{item.fg.id.slice(-12)}</span>
-                    </Link>
-                    <span className="text-xs font-semibold text-slate-600 flex-shrink-0">{item.fg.quantity} pcs</span>
-                    {canEdit && cartonStatus !== "dispatched" && (
-                      <button onClick={() => onRemove(item.fg.id)} disabled={removingId === item.fg.id}
-                        className="flex-shrink-0 text-xs px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-40 transition-colors">
-                        {removingId === item.fg.id ? "…" : "Remove"}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+      <span className="text-xs text-slate-500 flex-shrink-0">Add first</span>
+      <input
+        type="number" min={1} max={max} value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => e.key === "Enter" && valid && onAdd(n)}
+        placeholder={`1–${max}`}
+        className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      />
+      <span className="text-xs text-slate-400 flex-shrink-0">labels</span>
+      <button
+        onClick={() => valid && onAdd(n)}
+        disabled={!valid || adding}
+        className="ml-auto text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-40 hover:bg-blue-700 transition-colors flex-shrink-0">
+        {adding ? "…" : "Add"}
+      </button>
     </div>
   );
 }
 
-const statusColors: Record<string, string> = {
-  open:       "bg-emerald-50 text-emerald-700 border-emerald-200",
-  sealed:     "bg-amber-50 text-amber-700 border-amber-200",
-  dispatched: "bg-blue-50 text-blue-700 border-blue-200",
-};
+interface LabelRow { fg: any; product: any; }
 
-export default function CartonDetailPage({ params }: { params: Promise<{ id: string }> }) {
+interface ProductGroup {
+  productId: string;
+  productName: string;
+  sku: string;
+  imageUrl: string | null;
+  available: LabelRow[];
+  packed: LabelRow[];
+}
+
+export default function PackCartonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
-  const { canEdit, canDelete } = useAppSession();
-  const [data, setData]             = useState<any>(null);
-  const [loading, setLoading]       = useState(true);
-  const [notFound, setNotFound]     = useState(false);
-  const [updating, setUpdating]     = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting]     = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  const qrRef = useRef<QRDisplayHandle>(null);
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const [carton, setCarton]             = useState<any>(null);
+  const [loading, setLoading]           = useState(true);
+  const [mode, setMode]                 = useState<InputMode>("browse");
+  const [groups, setGroups]             = useState<ProductGroup[]>([]);
+  const [loadingLabels, setLoadingLabels] = useState(false);
+  const [selected, setSelected]         = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed]       = useState<Set<string>>(new Set());
+  const [bulkAdding, setBulkAdding]     = useState(false);
+  const [toast, setToast]               = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [manualInput, setManualInput]   = useState("");
+  const [addingManual, setAddingManual] = useState(false);
+  const [totalAdded, setTotalAdded]     = useState(0);
+  const [labelsAdded, setLabelsAdded]   = useState(0);
 
-  const [removingId, setRemovingId] = useState<string | null>(null);
-
-  async function fetchData() {
+  async function fetchCarton() {
     const res = await fetch(`/api/cartons/${id}`);
-    if (res.status === 404) { setNotFound(true); setLoading(false); return; }
-    setData(await res.json());
+    if (!res.ok) { setLoading(false); return; }
+    const data = await res.json();
+    setCarton(data.carton ?? null);
     setLoading(false);
   }
 
-  async function removeItem(fgId: string) {
-    setRemovingId(fgId);
-    const res = await fetch(`/api/cartons/${id}/remove-item`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ finishedGoodsId: fgId }),
-    });
-    if (res.ok) await fetchData();
-    setRemovingId(null);
-  }
-  useEffect(() => { fetchData(); }, [id]);
+  async function fetchLabels() {
+    setLoadingLabels(true);
+    const res = await fetch("/api/finished-goods");
+    const data = await res.json();
+    const rows: LabelRow[] = Array.isArray(data) ? data : [];
 
-  async function updateStatus(status: string) {
-    setUpdating(true);
-    await fetch(`/api/cartons/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    await fetchData();
-    setUpdating(false);
-  }
-
-  async function handleDelete() {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    setDeleting(true);
-    const res = await fetch(`/api/cartons/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      router.push("/cartons");
-    } else {
-      const err = await res.json();
-      alert(err.error || "Delete failed");
-      setDeleting(false);
-      setConfirmDelete(false);
+    // Group by product - deduplicate properly
+    const map = new Map<string, ProductGroup>();
+    for (const row of rows) {
+      const pid = row.fg.productId;
+      if (!map.has(pid)) {
+        map.set(pid, {
+          productId: pid,
+          productName: row.product?.name ?? "Unknown",
+          sku: row.product?.sku ?? "",
+          imageUrl: row.product?.imageUrl ?? null,
+          available: [],
+          packed: [],
+        });
+      }
+      const g = map.get(pid)!;
+      if (row.fg.status === "available") g.available.push(row);
+      else if (row.fg.status === "packed" && row.fg.cartonId === id) g.packed.push(row);
     }
+    setGroups(Array.from(map.values()).filter(g => g.available.length > 0 || g.packed.length > 0));
+    setLoadingLabels(false);
   }
 
-  function handlePrint() {
-    setShowPrintModal(true);
+  useEffect(() => { fetchCarton(); fetchLabels(); }, [id]);
+  useEffect(() => {
+    if (mode === "camera") setScannerActive(true);
+    else setScannerActive(false);
+  }, [mode]);
+
+  function showToast(type: "success" | "error", msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
   }
 
-  function doPrint({ showBranding, size }: { showBranding: boolean; size: "full" | "qr-only" }) {
-    if (!data) return;
-    const { carton, summary } = data;
-    printCartonLabel({
-      cartonNumber: carton.cartonNumber,
-      totalPieces: carton.totalPieces,
-      summary: summary.map((s: any) => ({
-        productName: s.productName,
-        sku: s.sku,
-        colorCategory: s.colorCategory ?? null,
-        designNumber: s.designNumber ?? null,
-        totalPieces: s.totalPieces,
-      })),
-      notes: carton.notes,
-      dataUrl: qrRef.current?.getDataUrl() ?? null,
-      showBranding,
-      size,
+  function toggleSelect(fgId: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(fgId)) next.delete(fgId); else next.add(fgId);
+      return next;
     });
   }
+
+  function selectAll(group: ProductGroup) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      group.available.forEach(row => next.add(row.fg.id));
+      return next;
+    });
+  }
+
+  function deselectAll(group: ProductGroup) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      group.available.forEach(row => next.delete(row.fg.id));
+      return next;
+    });
+  }
+
+  function toggleCollapse(productId: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId); else next.add(productId);
+      return next;
+    });
+  }
+
+  async function bulkAdd(ids: string[]) {
+    if (!ids.length) return;
+    setBulkAdding(true);
+    try {
+      const res = await fetch(`/api/cartons/${id}/bulk-add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const result = await res.json();
+      if (!res.ok) { showToast("error", result.error || "Failed"); return; }
+      showToast("success", `✓ Added ${result.added} labels · ${result.totalQty} pcs`);
+      setTotalAdded(prev => prev + result.totalQty);
+      setLabelsAdded(prev => prev + result.added);
+      setSelected(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; });
+      await Promise.all([fetchCarton(), fetchLabels()]);
+    } finally { setBulkAdding(false); }
+  }
+
+  async function addSingleManual(rawValue: string) {
+    const fgId = rawValue.trim().includes("/finished-goods/")
+      ? rawValue.trim().split("/finished-goods/").pop()?.split("?")[0] ?? rawValue.trim()
+      : rawValue.trim();
+    if (!fgId) return;
+    setAddingManual(true);
+    await bulkAdd([fgId]);
+    setManualInput("");
+    setAddingManual(false);
+  }
+
+  const selectedCount = selected.size;
+  const selectedIds = Array.from(selected);
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
     </div>
   );
-
-  if (notFound) return (
+  if (!carton) return null;
+  if (carton.status !== "open") return (
     <div className="text-center py-16">
-      <Box size={40} className="mx-auto text-slate-300 mb-3" />
-      <h2 className="font-bold text-slate-800 mb-2">Carton Not Found</h2>
-      <Link href="/cartons" className="text-blue-600 text-sm hover:underline">Back to cartons</Link>
+      <Package size={24} className="mx-auto text-amber-500 mb-3" />
+      <h2 className="font-bold text-slate-800 mb-2">Carton is {carton.status}</h2>
+      <Link href={`/cartons/${id}`} className="text-blue-600 text-sm hover:underline">Back to carton</Link>
     </div>
   );
-
-  const { carton, items, summary } = data;
 
   return (
-    <div className="space-y-4">
-      {showPrintModal && (
-        <PrintOptionsModal
-          title="Print Carton Label"
-          onPrint={doPrint}
-          onClose={() => setShowPrintModal(false)}
-        />
+    <div className="space-y-4 pb-32">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium max-w-xs text-center ${
+          toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-500 text-white"
+        }`}>
+          {toast.type === "success" ? <CheckCircle size={16} className="flex-shrink-0" /> : <AlertCircle size={16} className="flex-shrink-0" />}
+          {toast.msg}
+        </div>
       )}
-      {/* Top bar */}
+
       <div className="flex items-center justify-between">
-        {canEdit ? (
-          <Link href="/cartons" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
-            <ArrowLeft size={16} /> Back to Cartons
-          </Link>
-        ) : <div />}
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <button onClick={handlePrint}
-              className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
-              <Printer size={14} /> Print
-            </button>
-          )}
-          {canDelete && (
-            <button onClick={handleDelete} disabled={deleting}
-              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                confirmDelete ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-600 hover:bg-red-100"
-              }`}>
-              <Trash2 size={14} />
-              {deleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
-            </button>
-          )}
-        </div>
+        <Link href={`/cartons/${id}`} className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
+          <ArrowLeft size={16} /> Back
+        </Link>
       </div>
 
-      {/* Status bar */}
-      <div className={`rounded-2xl border-2 p-4 flex items-center gap-3 ${carton.purpose === "storage" ? "bg-emerald-50 border-emerald-300 text-emerald-800" : statusColors[carton.status]}`}>
-        {carton.purpose === "storage" ? <Warehouse size={24} /> : <Box size={24} />}
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-800 font-mono text-lg">{carton.cartonNumber}</p>
-          <div className="flex items-center gap-2 flex-wrap mt-0.5">
-            <span className="text-xs font-medium capitalize">
-              {carton.purpose === "storage" ? "📦 Storage" : `🚚 Dispatch · ${carton.status}`}
-            </span>
-            {carton.storageLocation && (
-              <span className="text-xs flex items-center gap-0.5 text-emerald-700">
-                <MapPin size={10} /> {carton.storageLocation}
-              </span>
-            )}
+      {/* Carton info */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
+            <Package size={18} className="text-violet-600" />
+          </div>
+          <div>
+            <p className="font-bold text-slate-800 font-mono text-sm">{carton.cartonNumber}</p>
+            <p className="text-xs text-slate-500">{carton.totalPieces} pcs packed</p>
           </div>
         </div>
+        {(labelsAdded > 0) && (
+          <div className="text-right">
+            <p className="text-sm font-bold text-emerald-600">+{labelsAdded} labels</p>
+            <p className="text-xs text-slate-400">+{totalAdded} pcs this session</p>
+          </div>
+        )}
       </div>
 
-      {/* QR */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center gap-3">
-        <QRDisplay ref={qrRef} value={`${baseUrl}/cartons/${carton.id}`} size={180} />
-        <p className="text-xs text-slate-400 font-mono">Scan to view carton details</p>
+      {/* Mode toggle */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-1 flex gap-1">
+        {(["browse", "camera", "manual"] as InputMode[]).map(m => (
+          <button key={m} onClick={() => setMode(m)}
+            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors capitalize ${
+              mode === m ? "bg-blue-600 text-white" : "text-slate-500 hover:bg-slate-50"
+            }`}>
+            {m === "browse" ? "📋 Browse" : m === "camera" ? "📷 Scan" : "⌨️ Paste"}
+          </button>
+        ))}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-          <p className="text-3xl font-black text-violet-600">{carton.totalPieces}</p>
-          <p className="text-xs text-slate-500 mt-1">Total Pieces</p>
+      {/* Camera */}
+      {mode === "camera" && (
+        <div className="bg-white rounded-2xl border-2 border-blue-200 p-4">
+          <QRScanner onScan={v => addSingleManual(v)} active={scannerActive} />
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-          <p className="text-3xl font-black text-blue-600">{items.length}</p>
-          <p className="text-xs text-slate-500 mt-1">QR Labels</p>
-        </div>
-      </div>
+      )}
 
-      {/* Product summary */}
-      {summary.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide mb-3">Product Breakdown</h2>
-          <div className="space-y-2">
-            {summary.map((s: any, i: number) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                <div>
-                  <p className="font-medium text-slate-800 text-sm">{s.productName}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <span className="text-xs text-slate-400 font-mono">{s.sku}</span>
-                    {s.designNumber && (
-                      <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Design {s.designNumber}</span>
-                    )}
-                    {s.colorCategory && (
-                      <span className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{s.colorCategory}</span>
-                    )}
-                    <span className="text-xs text-slate-400">{s.items} label{s.items !== 1 ? "s" : ""}</span>
-                  </div>
-                </div>
-                <span className="font-bold text-slate-700 ml-2">{s.totalPieces} pcs</span>
-              </div>
-            ))}
-            <div className="flex items-center justify-between py-2 font-bold">
-              <span className="text-slate-700">Total</span>
-              <span className="text-violet-600 text-lg">{carton.totalPieces} pcs</span>
+      {/* Manual */}
+      {mode === "manual" && (
+        <div className="bg-white rounded-2xl border-2 border-blue-200 p-4 flex gap-2">
+          <input value={manualInput} onChange={e => setManualInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addSingleManual(manualInput)}
+            placeholder="Paste label ID or URL…"
+            className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
+          <button onClick={() => addSingleManual(manualInput)} disabled={addingManual || !manualInput.trim()}
+            className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-60 hover:bg-blue-700">
+            Add
+          </button>
+        </div>
+      )}
+
+      {/* Browse — SKU folders */}
+      {mode === "browse" && (
+        <div className="space-y-3">
+          {loadingLabels ? (
+            <div className="text-center py-8 text-slate-400">Loading labels…</div>
+          ) : groups.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 bg-white rounded-2xl border border-slate-200">
+              <Package size={28} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No available labels</p>
             </div>
+          ) : (
+            groups.map(group => {
+              const isCollapsed = collapsed.has(group.productId);
+              const allSelected = group.available.length > 0 && group.available.every(r => selected.has(r.fg.id));
+              const someSelected = group.available.some(r => selected.has(r.fg.id));
+              const groupSelectedIds = group.available.filter(r => selected.has(r.fg.id)).map(r => r.fg.id);
+
+              return (
+                <div key={group.productId} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                  {/* Group header */}
+                  <div className="flex items-center gap-3 p-3 border-b border-slate-100">
+                    {group.imageUrl ? (
+                      <img src={group.imageUrl} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" alt="" />
+                    ) : (
+                      <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Package size={16} className="text-emerald-600" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 text-sm truncate">{group.productName}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs font-mono text-blue-600">{group.sku}</span>
+                        <span className="text-xs text-emerald-600 font-medium">{group.available.length} available</span>
+                        {group.packed.length > 0 && <span className="text-xs text-slate-400">{group.packed.length} packed</span>}
+                      </div>
+                    </div>
+                    {/* Select all / deselect all */}
+                    {group.available.length > 0 && (
+                      <button
+                        onClick={() => allSelected ? deselectAll(group) : selectAll(group)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors flex-shrink-0 ${
+                          allSelected ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                        }`}>
+                        {allSelected ? "Deselect all" : "Select all"}
+                      </button>
+                    )}
+                    <button onClick={() => toggleCollapse(group.productId)} className="text-slate-400 p-1">
+                      {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    </button>
+                  </div>
+
+                  {/* Quick-add by number */}
+                  {group.available.length > 0 && (
+                    <QuickAdd
+                      max={group.available.length}
+                      onAdd={(n) => bulkAdd(group.available.slice(0, n).map(r => r.fg.id))}
+                      adding={bulkAdding}
+                    />
+                  )}
+
+                  {/* Labels list */}
+                  {!isCollapsed && (
+                    <div className="divide-y divide-slate-50">
+                      {group.available.map(row => {
+                        const isChecked = selected.has(row.fg.id);
+                        return (
+                          <div key={row.fg.id}
+                            onClick={() => toggleSelect(row.fg.id)}
+                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isChecked ? "bg-blue-50" : "hover:bg-slate-50"}`}>
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                              isChecked ? "bg-blue-600 border-blue-600" : "border-slate-300"
+                            }`}>
+                              {isChecked && <Check size={12} className="text-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-slate-500 font-mono">{row.fg.id.slice(-12)}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{row.fg.quantity} pcs</span>
+                          </div>
+                        );
+                      })}
+                      {/* Packed labels — collapsed section */}
+                      {group.packed.length > 0 && (
+                        <div className="px-4 py-2 bg-slate-50">
+                          <p className="text-xs text-slate-400">{group.packed.length} already packed in this carton</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Sticky bottom bar when items selected */}
+      {selectedCount > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg z-40">
+          <div className="max-w-2xl mx-auto flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-800">{selectedCount} label{selectedCount !== 1 ? "s" : ""} selected</p>
+              <p className="text-xs text-slate-500">
+                {groups.reduce((s, g) => s + g.available.filter(r => selected.has(r.fg.id)).reduce((a, r) => a + r.fg.quantity, 0), 0)} pcs total
+              </p>
+            </div>
+            <button onClick={() => setSelected(new Set())}
+              className="px-3 py-2 rounded-xl text-sm text-slate-500 hover:bg-slate-100 transition-colors">
+              Clear
+            </button>
+            <button onClick={() => bulkAdd(selectedIds)} disabled={bulkAdding}
+              className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition-colors">
+              {bulkAdding ? (
+                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Adding…</>
+              ) : (
+                <><CheckCircle size={16} /> Add {selectedCount} to Carton</>
+              )}
+            </button>
           </div>
         </div>
       )}
-
-      {/* Packed labels — grouped by SKU */}
-      {items.length > 0 && (
-        <PackedLabelsGrouped
-          items={items}
-          canEdit={canEdit}
-          cartonStatus={carton.status}
-          removingId={removingId}
-          onRemove={removeItem}
-        />
-      )}
-
-      {/* Actions — staff/admin only */}
-      {canEdit && carton.status !== "dispatched" && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
-          <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Actions</h2>
-          {carton.status === "open" && (
-            <Link href={`/cartons/${id}/pack`}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
-              <ScanLine size={18} /> Add Items to Carton
-            </Link>
-          )}
-          {carton.status === "open" && (
-            <button onClick={() => updateStatus("sealed")} disabled={updating}
-              className="w-full flex items-center justify-center gap-2 bg-amber-500 text-white py-3 rounded-xl font-medium hover:bg-amber-600 disabled:opacity-60 transition-colors">
-              <Lock size={18} /> {updating ? "Sealing..." : "Seal Carton"}
-            </button>
-          )}
-          {carton.status === "sealed" && (
-            <button onClick={() => updateStatus("dispatched")} disabled={updating}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
-              <Truck size={18} /> {updating ? "Dispatching..." : "Mark as Dispatched"}
-            </button>
-          )}
-        </div>
-      )}
-
-      {carton.notes && (
-        <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm text-slate-600">
-          <span className="font-medium">Notes:</span> {carton.notes}
-        </div>
-      )}
-      <p className="text-center text-xs text-slate-400 font-mono">
-        Created {new Date(carton.createdAt).toLocaleString()}
-      </p>
     </div>
   );
 }
