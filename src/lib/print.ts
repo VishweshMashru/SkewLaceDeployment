@@ -29,10 +29,14 @@ function openPrint(title: string, body: string) {
   win.document.close();
 }
 
+// Branding — override with NEXT_PUBLIC_BRAND_NAME and NEXT_PUBLIC_BRAND_URL env vars
+const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME ?? "LybyTex";
+const BRAND_URL  = process.env.NEXT_PUBLIC_BRAND_URL  ?? "lybytex.com";
+
 function brandingHtml() {
   return (
-    '<div class="brand">LybyTex</div>' +
-    '<div class="brand-url">lybytex.com</div>' +
+    '<div class="brand">' + BRAND_NAME + '</div>' +
+    '<div class="brand-url">' + BRAND_URL + '</div>' +
     '<hr class="divider" />'
   );
 }
@@ -180,7 +184,7 @@ export function printCartonLabel(opts: {
 
   const body = (
     '<div class="label">' +
-    (showBranding ? '<div class="brand">LybyTex</div><div class="brand-url">lybytex.com</div><hr class="divider" />' : "") +
+    (showBranding ? '<div class="brand">' + BRAND_NAME + '</div><div class="brand-url">' + BRAND_URL + '</div><hr class="divider" />' : "") +
     '<div class="tag">Carton</div>' +
     '<div class="num">' + opts.cartonNumber + "</div>" +
     (opts.dataUrl ? '<img class="qr" src="' + opts.dataUrl + '" />' : "") +

@@ -75,7 +75,6 @@ export default function DashboardPage() {
   const cartonSealed   = data.cartons?.sealed ?? 0;
   const batchPreparing = data.batches?.preparing ?? 0;
   const openOrders     = data.openOrders ?? [];
-  const aiSuggestions  = data.aiSuggestions ?? [];
   const ruleInsights   = data.insights ?? [];
 
   return (
@@ -173,38 +172,6 @@ export default function DashboardPage() {
           <StatCard label="Batches" value={batchPreparing} icon={Archive}
             color="bg-blue-50 text-blue-600" href="/batches" sub="active" />
         </div>
-      </div>
-
-      {/* AI Suggestions */}
-      <div>
-        <div className="flex items-center gap-2 px-1 mb-2">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">AI Suggestions</p>
-          <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
-            <span>✦</span> Based on your data only
-          </span>
-        </div>
-        {!aiSuggestions || aiSuggestions.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center">
-            <CheckCircle size={28} className="mx-auto text-emerald-400 mb-2" />
-            <p className="text-sm font-medium text-slate-700">Nothing to flag</p>
-            <p className="text-xs text-slate-400 mt-1">Link orders to products and generate labels to see AI suggestions.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {aiSuggestions.map((s: any, i: number) => {
-              const style = insightStyles[s.type] ?? insightStyles.info;
-              return (
-                <div key={i} className={`rounded-2xl border p-4 flex items-start gap-3 ${style.bg} ${style.border}`}>
-                  <style.Icon size={16} className={`${style.iconColor} flex-shrink-0 mt-0.5`} />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{s.title}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">{s.detail}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Insights */}

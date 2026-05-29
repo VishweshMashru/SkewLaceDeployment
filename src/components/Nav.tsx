@@ -44,7 +44,7 @@ export default function Nav() {
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2 font-bold text-blue-600 text-lg flex-shrink-0">
             <Box size={20} />
-            <span className="hidden sm:inline">CartonTrack</span>
+            <span className="hidden sm:inline">{process.env.NEXT_PUBLIC_BRAND_NAME ?? "CartonTrack"}</span>
             <span className="sm:hidden">CT</span>
           </Link>
 

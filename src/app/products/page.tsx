@@ -233,6 +233,7 @@ export default function ProductsPage() {
   const [uploading, setUploading]       = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { canEdit, canDelete } = useAppSession();
+  const aiEnabled = process.env.NEXT_PUBLIC_AI_ENABLED !== "false";
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
 
@@ -333,12 +334,14 @@ export default function ProductsPage() {
       <div className="flex items-center gap-2">
         {canEdit && (
           <>
-            <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
-              className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
-              {scanning ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
-              {scanning ? "Scanning…" : "Scan Sheet"}
-            </button>
-            <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScanImage} className="hidden" />
+            {aiEnabled && <>
+              <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
+                className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
+                {scanning ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
+                {scanning ? "Scanning…" : "Scan Sheet"}
+              </button>
+              <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScanImage} className="hidden" />
+            </>}
             <button onClick={() => setShowForm(!showForm)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
               {showForm ? <X size={16} /> : <Plus size={16} />}

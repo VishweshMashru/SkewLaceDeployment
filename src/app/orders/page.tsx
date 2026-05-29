@@ -154,6 +154,7 @@ export default function OrdersPage() {
   }
 
   const filtered = orders.filter((o: any) => statusFilter === "all" || o.status === statusFilter);
+  const aiEnabled = process.env.NEXT_PUBLIC_AI_ENABLED !== "false";
   const counts = {
     all: orders.length,
     open: orders.filter(o => o.status === "open").length,
@@ -166,12 +167,14 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-800">Orders</h1>
       <div className="flex items-center gap-2">
-          <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
-            className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
-            {scanning ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
-            {scanning ? "Scanning…" : "Scan"}
-          </button>
-          <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
+          {aiEnabled && <>
+            <button onClick={() => scanInputRef.current?.click()} disabled={scanning}
+              className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-60 transition-colors">
+              {scanning ? <Loader2 size={16} className="animate-spin" /> : <ScanLine size={16} />}
+              {scanning ? "Scanning…" : "Scan"}
+            </button>
+            <input ref={scanInputRef} type="file" accept="image/*" capture="environment" onChange={handleScan} className="hidden" />
+          </>}
           <button onClick={() => { setShowManual(!showManual); setScanResult(null); }}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
             {showManual ? <X size={16} /> : <Plus size={16} />}

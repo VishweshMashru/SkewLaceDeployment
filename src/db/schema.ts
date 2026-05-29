@@ -66,11 +66,15 @@ export const finishedGoods = pgTable("finished_goods", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const cartonPurposeEnum = pgEnum("carton_purpose", ["dispatch", "storage"]);
+
 export const cartons = pgTable("cartons", {
   id: text("id").primaryKey(),
   cartonNumber: text("carton_number").notNull().unique(),
   batchId: text("batch_id").references(() => batches.id),
   status: cartonStatusEnum("status").default("open").notNull(),
+  purpose: cartonPurposeEnum("purpose").default("dispatch").notNull(),
+  storageLocation: text("storage_location"),
   notes: text("notes"),
   totalPieces: integer("total_pieces").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

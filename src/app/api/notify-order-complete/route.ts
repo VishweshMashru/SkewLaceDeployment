@@ -28,10 +28,10 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${resendKey}`,
         },
         body: JSON.stringify({
-          from: "CartonTrack <notifications@lybytex.com>",
-          to: ["lybytexindiavishwesh@gmail.com"],
+          from: `${process.env.NEXT_PUBLIC_BRAND_NAME ?? "CartonTrack"} <notifications@${process.env.NEXT_PUBLIC_BRAND_URL ?? "cartontrack.com"}>`,
+          to: [process.env.NOTIFY_EMAIL ?? "admin@example.com"],
           subject: `✅ Order Complete: ${order.title}`,
-          text: `Order "${order.title}" is now complete!\n\n${order.buyerName ? "Buyer: " + order.buyerName + "\n" : ""}Total: ${totalPieces} pieces\n\nLines:\n${linesSummary}\n\n—\nCartonTrack by LybyTex`,
+          text: `Order "${order.title}" is now complete!\n\n${order.buyerName ? "Buyer: " + order.buyerName + "\n" : ""}Total: ${totalPieces} pieces\n\nLines:\n${linesSummary}\n\n—\n" + (process.env.NEXT_PUBLIC_BRAND_NAME ?? "CartonTrack") + "`,
           html: `
             <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px">
               <h2 style="color:#16a34a">✅ Order Complete</h2>
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
                   `).join("")}
                 </tbody>
               </table>
-              <p style="margin-top:20px;color:#64748b;font-size:12px">CartonTrack · LybyTex</p>
+              <p style="margin-top:20px;color:#64748b;font-size:12px">" + (process.env.NEXT_PUBLIC_BRAND_NAME ?? "CartonTrack") + "</p>
             </div>
           `,
         }),

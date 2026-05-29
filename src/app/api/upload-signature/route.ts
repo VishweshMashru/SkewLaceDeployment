@@ -12,7 +12,7 @@ export async function GET() {
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
-    const folder = "carton-track/products";
+    const folder = process.env.CLOUDINARY_FOLDER ?? "carton-track/products";
 
     const signature = createHash("sha1")
       .update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`)

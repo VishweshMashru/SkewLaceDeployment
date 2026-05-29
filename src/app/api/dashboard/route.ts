@@ -172,84 +172,6 @@ export async function GET() {
       return true;
     }).slice(0, 8);
 
-    // Build a data summary for Claude to analyze
-    const orderSummary = openOrders.map(o => {
-      const target = o.lines.reduce((s, l) => s + l.targetQty, 0);
-      const actual = o.lines.reduce((s, l) => s + (l.actualQty ?? 0), 0);
-      const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
-      const daysSince = Math.floor((now.getTime() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-      const pendingLines = o.lines.filter(l => l.status !== "completed").map(l => ({
-        product: l.productName + (l.colorCategory ? " " + l.colorCategory : ""),
-        target: l.targetQty,
-        actual: l.actualQty ?? 0,
-        remaining: l.targetQty - (l.actualQty ?? 0),
-        dailyPace: paceMap.get(l.productId ?? "") ?? 0,
-        daysIdle: l.productId && lastLabelMap.get(l.productId)
-          ? Math.floor((now.getTime() - lastLabelMap.get(l.productId)!.getTime()) / (1000 * 60 * 60 * 24))
-          : null,
-      }));
-      return {
-        title: o.title,
-        buyer: o.buyerName,
-        daysOld: daysSince,
-        progress: pct + "%",
-        totalTarget: target,
-        totalActual: actual,
-        pendingLines,
-      };
-    });
-
-    let aiSuggestions: { type: string; title: string; detail: string }[] = [];
-
-    try {
-      const Anthropic = (await import("@anthropic-ai/sdk")).default;
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-      const dataContext = JSON.stringify({
-        today: { labels: todayLabels[0]?.count ?? 0, pieces: todayLabels[0]?.pieces ?? 0 },
-        yesterday: { pieces: yesterdayLabels[0]?.pieces ?? 0 },
-        weekAvgPerDay: Math.round((weekLabels[0]?.pieces ?? 0) / 7),
-        openOrders: orderSummary,
-        cartons: { open: cartonStats.find(c => c.status === "open")?.count ?? 0, sealed: cartonStats.find(c => c.status === "sealed")?.count ?? 0 },
-      }, null, 2);
-
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 800,
-        messages: [{
-          role: "user",
-          content: `You are a production operations advisor for a textile factory. Analyze this real production data and give 3-5 specific, actionable suggestions. 
-
-STRICT RULES:
-- Only reference numbers and facts that are in the data below
-- No guessing, no assumptions, no generic advice
-- Each suggestion must cite specific numbers from the data
-- If data is insufficient to make a suggestion, skip it
-- Be direct and specific like a factory floor manager would be
-
-Data:
-${dataContext}
-
-Return ONLY a JSON array, no other text:
-[
-  {
-    "type": "warning|info|success|danger",
-    "title": "short title (max 8 words)",
-    "detail": "specific actionable detail citing real numbers"
-  }
-]`
-        }]
-      });
-
-      const text = response.content[0].type === "text" ? response.content[0].text : "[]";
-      const clean = text.replace(/```json|```/g, "").trim();
-      aiSuggestions = JSON.parse(clean);
-    } catch (e) {
-      console.error("AI suggestions error:", e);
-      // Fall back to rule-based insights if AI fails
-      aiSuggestions = uniqueInsights;
-    }
-
     return NextResponse.json({
       today: {
         labels: todayLabels[0]?.count ?? 0,
@@ -273,8 +195,7 @@ Return ONLY a JSON array, no other text:
         lines: o.lines.length,
         completedLines: o.lines.filter(l => l.status === "completed").length,
       })),
-      insights: uniqueInsights,       // rule-based, always present
-      aiSuggestions,                  // Claude-generated, data-grounded
+      insights: uniqueInsights,
     });
   } catch (e) {
     console.error("Dashboard error:", e);

@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 
 export async function GET() {
   try {
-    // Summary per product: available, packed, dispatched counts + pieces
+    // Storage carton items count as "in stock" (available)
     const rows = await db.execute(sql`
       SELECT
         p.id AS product_id,
@@ -12,15 +12,22 @@ export async function GET() {
         p.sku,
         p.design_number,
         p.color_category,
+        p.image_url,
         COUNT(*) FILTER (WHERE fg.status = 'available')   AS available_labels,
-        COUNT(*) FILTER (WHERE fg.status = 'packed')      AS packed_labels,
+        COUNT(*) FILTER (WHERE fg.status = 'packed' AND (c.purpose = 'storage' OR c.id IS NULL AND fg.status = 'packed'))   AS storage_labels,
+        COUNT(*) FILTER (WHERE fg.status = 'packed' AND c.purpose = 'dispatch') AS packed_labels,
         COUNT(*) FILTER (WHERE fg.status = 'dispatched')  AS dispatched_labels,
-        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'available'),  0) AS available_pieces,
-        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'packed'),     0) AS packed_pieces,
-        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'dispatched'), 0) AS dispatched_pieces
+        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'available'), 0) AS available_pieces,
+        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'packed' AND c.purpose = 'storage'), 0) AS storage_pieces,
+        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'packed' AND c.purpose = 'dispatch'), 0) AS packed_pieces,
+        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'dispatched'), 0) AS dispatched_pieces,
+        -- Total in stock = available (loose) + in storage cartons
+        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'available'), 0) +
+        COALESCE(SUM(fg.quantity) FILTER (WHERE fg.status = 'packed' AND c.purpose = 'storage'), 0) AS total_in_stock
       FROM products p
       LEFT JOIN finished_goods fg ON fg.product_id = p.id
-      GROUP BY p.id, p.name, p.sku, p.design_number, p.color_category
+      LEFT JOIN cartons c ON c.id = fg.carton_id
+      GROUP BY p.id, p.name, p.sku, p.design_number, p.color_category, p.image_url
       ORDER BY p.name ASC
     `);
 

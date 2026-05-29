@@ -8,6 +8,8 @@ import { desc, eq } from "drizzle-orm";
 const createCartonSchema = z.object({
   notes: z.string().optional(),
   batchId: z.string().optional(),
+  purpose: z.enum(["dispatch", "storage"]).default("dispatch"),
+  storageLocation: z.string().optional(),
 });
 
 export async function GET() {
@@ -28,7 +30,14 @@ export async function POST(req: NextRequest) {
     const cartonNumber = generateCartonNumber();
     const [carton] = await db
       .insert(cartons)
-      .values({ id, cartonNumber, notes: data.notes, batchId: data.batchId })
+      .values({
+        id,
+        cartonNumber,
+        notes: data.notes,
+        batchId: data.batchId,
+        purpose: data.purpose,
+        storageLocation: data.storageLocation,
+      })
       .returning();
     return NextResponse.json(carton, { status: 201 });
   } catch (e) {
