@@ -2,7 +2,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Box, Package, Truck, Lock, Trash2, Plus, X, Archive } from "lucide-react";
+import { ArrowLeft, Box, Package, Truck, Lock, Trash2, Plus, X, Archive, Printer } from "lucide-react";
 import { useAppSession } from "@/components/SessionProvider";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -347,6 +347,20 @@ export default function BatchDetailPage({ params }: { params: Promise<{ id: stri
           ))
         )}
       </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+    <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Packing List</h2>
+    <div className="grid grid-cols-2 gap-2">
+      <a href={`/api/batches/${id}/packing-list?mode=summary`} target="_blank"
+        className="flex items-center justify-center gap-2 border border-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+        <Printer size={15} /> Summary PDF
+      </a>
+      <a href={`/api/batches/${id}/packing-list?mode=detailed`} target="_blank"
+        className="flex items-center justify-center gap-2 border border-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+        <Printer size={15} /> Detailed PDF
+      </a>
+    </div>
+  </div>
 
       {/* Batch actions */}
       {canEdit && batch.status !== "dispatched" && (
