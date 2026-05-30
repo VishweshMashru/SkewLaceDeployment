@@ -1,78 +1,26 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Package, Box, CheckCircle, Truck, Clock, Printer, Trash2 } from "lucide-react";
-import QRDisplay, { type QRDisplayHandle } from "@/components/QRDisplay";
-import { printFGLabel } from "@/lib/print";
-import { useAppSession } from "@/components/SessionProvider";
-import PrintOptionsModal from "@/components/PrintOptionsModal"
+import { ArrowLeft, CheckCircle, Package, Box, Truck } from "lucide-react";
 
-const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
-  available: { label: "Available", icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
-  packed:    { label: "Packed in Carton", icon: Box,          color: "text-amber-600",  bg: "bg-amber-50 border-amber-200"  },
-  dispatched:{ label: "Dispatched",       icon: Truck,        color: "text-blue-600",   bg: "bg-blue-50 border-blue-200"    },
+const statusConfig: Record<string, { label: string; sub: string; color: string; icon: any }> = {
+  available:  { label: "Available",  sub: "Ready to be packed into a carton", color: "bg-emerald-50 border-emerald-300 text-emerald-700", icon: CheckCircle },
+  packed:     { label: "Packed",     sub: "Inside a carton",                  color: "bg-amber-50 border-amber-300 text-amber-700",   icon: Box          },
+  dispatched: { label: "Dispatched", sub: "Shipped out",                      color: "bg-blue-50 border-blue-300 text-blue-700",      icon: Truck        },
 };
 
-export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function FGDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
-  const { canEdit, canDelete } = useAppSession();
-  const [data, setData]       = useState<any>(null);
+  const [data, setData]     = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  const qrRef = useRef<QRDisplayHandle>(null);
-
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const [error, setError]   = useState("");
 
   useEffect(() => {
-    fetch(`/api/finished-goods/${id}`)
-      .then(async (res) => {
-        if (res.status === 404) { setNotFound(true); return; }
-        setData(await res.json());
-      })
-      .finally(() => setLoading(false));
+    fetch("/api/finished-goods/" + id)
+      .then(r => r.ok ? r.json() : Promise.reject("Not found"))
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setError(String(e)); setLoading(false); });
   }, [id]);
-
-  function handlePrint() {
-    setShowPrintModal(true);
-  }
-
-  function doPrint({ showBranding, size }: { showBranding: boolean; size: "full" | "qr-only" }) {
-    const dataUrl = qrRef.current?.getDataUrl() ?? null;
-    if (!data) return;
-    const { fg, product } = data;
-    printFGLabel({
-      productName: product?.name ?? "",
-      designNumber: product?.designNumber,
-      sku: product?.sku,
-      colorCategory: product?.colorCategory,
-      quantity: fg.quantity,
-      id: fg.id,
-      dataUrl,
-      imageUrl: product?.imageUrl,
-      showBranding,
-      size,
-    });
-  }
-
-  async function handleDelete() {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    setDeleting(true);
-    const res = await fetch(`/api/finished-goods/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      router.push("/finished-goods");
-    } else {
-      const err = await res.json();
-      alert(err.error || "Delete failed");
-      setDeleting(false);
-      setConfirmDelete(false);
-    }
-  }
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
@@ -80,126 +28,136 @@ export default function FinishedGoodsDetailPage({ params }: { params: Promise<{ 
     </div>
   );
 
-  if (notFound) return (
+  if (error || !data) return (
     <div className="text-center py-16">
-      <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Package size={28} className="text-red-400" />
-      </div>
-      <h2 className="font-bold text-slate-800 text-lg mb-2">Label Not Found</h2>
-      <p className="text-slate-500 text-sm">This QR code is invalid or has been removed.</p>
-      <Link href="/" className="mt-4 inline-block text-blue-600 text-sm hover:underline">Go home</Link>
+      <Package size={32} className="mx-auto text-slate-300 mb-3" />
+      <p className="text-slate-500 font-medium">Label not found</p>
+      <Link href="/finished-goods" className="text-blue-600 text-sm hover:underline mt-2 block">Back to Labels</Link>
     </div>
   );
 
-  if (!data) return null;
-  const { fg, product, carton } = data;
-  const status = statusConfig[fg.status] ?? statusConfig.available;
-  const StatusIcon = status.icon;
+  const { fg, product } = data;
+  const sc = statusConfig[fg.status] ?? statusConfig.available;
+  const Icon = sc.icon;
+
+  // New fields from updated schema
+  const metersPerPiece = product?.metersPerPiece ?? null;
+  const size           = product?.size ?? null;
+  const designNumber   = product?.designNumber ?? fg.designNumber ?? null;
+  const colorCategory  = product?.colorCategory ?? null;
+  const totalMeters    = metersPerPiece ? (fg.quantity * parseFloat(metersPerPiece)).toFixed(2) : null;
 
   return (
     <div className="space-y-4">
-      {showPrintModal && (
-        <PrintOptionsModal
-          title="Print Label"
-          onPrint={doPrint}
-          onClose={() => setShowPrintModal(false)}
-        />
-      )}
-      {/* Top bar */}
-      <div className="flex items-center justify-between">
-        {canEdit ? (
-          <Link href="/finished-goods" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
-            <ArrowLeft size={16} /> Back to Labels
-          </Link>
-        ) : <div />}
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <button onClick={handlePrint}
-              className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
-              <Printer size={14} /> Print
-            </button>
-          )}
-          {canDelete && (
-            <button onClick={handleDelete} disabled={deleting}
-              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                confirmDelete ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-600 hover:bg-red-100"
-              }`}>
-              <Trash2 size={14} />
-              {deleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
-            </button>
-          )}
-        </div>
-      </div>
-      {/* Status banner */}
-      <div className={`rounded-2xl border-2 p-4 flex items-center gap-3 ${status.bg}`}>
-        <StatusIcon size={24} className={status.color} />
+      <Link href="/finished-goods" className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm">
+        <ArrowLeft size={16} /> Back to Labels
+      </Link>
+
+      {/* Status */}
+      <div className={`rounded-2xl border-2 p-4 flex items-center gap-3 ${sc.color}`}>
+        <Icon size={24} />
         <div>
-          <p className="font-bold text-slate-800">{status.label}</p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {fg.status === "available"  && "Ready to be packed into a carton"}
-            {fg.status === "packed"     && carton && `Packed in Carton ${carton.cartonNumber}`}
-            {fg.status === "dispatched" && "This item has been dispatched"}
-          </p>
+          <p className="font-bold text-lg">{sc.label}</p>
+          <p className="text-sm opacity-80">{sc.sub}</p>
         </div>
       </div>
 
-      {/* QR */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {product?.imageUrl && (
-          <div className="w-full aspect-[3/2] relative">
-            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-          </div>
-        )}
-        <div className="p-6 flex flex-col items-center gap-4">
-          <QRDisplay ref={qrRef} value={`${baseUrl}/finished-goods/${fg.id}`} size={180} />
-          <div className="text-center">
-            <h1 className="text-xl font-bold text-slate-800">{product?.name}</h1>
-            {product?.designNumber && <p className="text-sm text-slate-500 mt-1">Design {product.designNumber}</p>}
-            {product?.colorCategory && (
-              <span className="inline-block mt-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
-                {product.colorCategory}
-              </span>
-            )}
-          </div>
-        </div>
+      {/* QR + Product name */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col items-center gap-3">
+        <img
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : id)}`}
+          className="w-48 h-48"
+          alt="QR Code"
+        />
+        <p className="text-xl font-bold text-slate-800 text-center">{product?.name ?? "Unknown Product"}</p>
+        {designNumber && <p className="text-sm text-slate-500">D.NO {designNumber}</p>}
+        {colorCategory && <p className="text-sm text-slate-400">{colorCategory}</p>}
       </div>
 
-      {/* Details */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
-        <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Details</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-slate-50 rounded-xl p-3">
-            <p className="text-xs text-slate-500 mb-1">Quantity</p>
+      {/* Details grid */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Details</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Quantity</p>
             <p className="text-2xl font-black text-blue-600">{fg.quantity}</p>
-            <p className="text-xs text-slate-400">pieces</p>
+            <p className="text-xs text-slate-400">
+              {fg.trackingType === "piece" ? "piece" : fg.trackingType === "dozen" ? "dozen (12 pcs)" : "pcs"}
+            </p>
           </div>
-          <div className="bg-slate-50 rounded-xl p-3">
-            <p className="text-xs text-slate-500 mb-1">Tracking Type</p>
-            <p className="font-semibold text-slate-800 capitalize">{fg.trackingType}</p>
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Tracking Type</p>
+            <p className="text-lg font-bold text-slate-800 capitalize">{fg.trackingType === "piece" ? "Piece" : fg.trackingType === "dozen" ? "Dozen" : "Custom"}</p>
           </div>
-          <div className="bg-slate-50 rounded-xl p-3">
-            <p className="text-xs text-slate-500 mb-1">SKU</p>
-            <p className="font-mono text-sm font-semibold text-slate-800">{product?.sku}</p>
+
+          {designNumber && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1">D.NO</p>
+              <p className="text-lg font-bold text-slate-800">{designNumber}</p>
+            </div>
+          )}
+
+          {colorCategory && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Color</p>
+              <p className="text-lg font-bold text-slate-800">{colorCategory}</p>
+            </div>
+          )}
+
+          {metersPerPiece && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1">MTS / Piece</p>
+              <p className="text-lg font-bold text-slate-800">{metersPerPiece} m</p>
+            </div>
+          )}
+
+          {totalMeters && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Total Meters</p>
+              <p className="text-lg font-bold text-emerald-600">{totalMeters} m</p>
+            </div>
+          )}
+
+          {size && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Size</p>
+              <p className="text-lg font-bold text-slate-800">{size}</p>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs text-slate-400 mb-1">SKU</p>
+            <p className="text-sm font-mono font-bold text-slate-700">{product?.sku ?? "-"}</p>
           </div>
-          <div className="bg-slate-50 rounded-xl p-3">
-            <p className="text-xs text-slate-500 mb-1">Label ID</p>
-            <p className="font-mono text-xs text-slate-600 break-all">{fg.id}</p>
+
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Label ID</p>
+            <p className="text-sm font-mono text-slate-600">{fg.id}</p>
           </div>
         </div>
       </div>
 
-      {/* Carton link */}
-      {carton && (
-        <Link
-          href={`/cartons/${carton.id}`}
-          className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3 hover:bg-blue-100 transition-colors"
-        >
-          <Box size={20} className="text-blue-600 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="font-semibold text-blue-800">Carton {carton.cartonNumber}</p>
-            <p className="text-xs text-blue-600 mt-0.5">Tap to view carton details</p>
+      {/* Product image if available */}
+      {product?.imageUrl && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Product Photo</p>
+          <img src={product.imageUrl} alt={product.name}
+            className="w-full max-h-48 object-contain rounded-xl" />
+        </div>
+      )}
+
+      {/* Carton info if packed */}
+      {fg.cartonId && (
+        <Link href={"/cartons/" + fg.cartonId}
+          className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3 hover:shadow-sm transition-all">
+          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+            <Box size={18} className="text-amber-600" />
           </div>
-          <ArrowLeft size={16} className="text-blue-400 rotate-180" />
+          <div>
+            <p className="text-xs text-slate-400">Packed in carton</p>
+            <p className="font-mono font-semibold text-slate-800">{fg.cartonId}</p>
+          </div>
+          <ArrowLeft size={16} className="ml-auto text-slate-300 rotate-180" />
         </Link>
       )}
 
