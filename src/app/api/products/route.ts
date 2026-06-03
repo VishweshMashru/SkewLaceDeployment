@@ -3,11 +3,11 @@ import { db } from "@/db";
 import { products } from "@/db/schema";
 import { generateId } from "@/lib/id";
 import { z } from "zod";
-import { desc, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 const createProductSchema = z.object({
   name: z.string().min(1),
-  sku: z.string().optional(), // auto-generated if not provided
+  sku: z.string().optional(),
   designNumber: z.string().optional(),
   colorCategory: z.string().optional(),
   imageUrl: z.string().optional(),
@@ -32,15 +32,33 @@ export async function POST(req: NextRequest) {
     const data = createProductSchema.parse(body);
     const id = generateId("PRD");
 
-    // Auto-generate SKU if not provided
-    const countRes = await db.select({ count: sql<number>`count(*)::int` }).from(products);
-    const count = (countRes[0]?.count ?? 0) + 1;
-    const sku = data.sku?.trim() || `SKU-${String(count).padStart(4, "0")}`;
+    // Auto-generate SKU based on highest existing SKU number — avoids collisions on delete
+    let sku = data.sku?.trim() || "";
+    if (!sku) {
+      const existing = await db.select({ sku: products.sku }).from(products);
+      const maxNum = existing.reduce((max, p) => {
+        const match = p.sku.match(/SKU-(\d+)/);
+        if (match) return Math.max(max, parseInt(match[1]));
+        return max;
+      }, 0);
+      sku = `SKU-${String(maxNum + 1).padStart(4, "0")}`;
+    }
 
     const [product] = await db
       .insert(products)
-      .values({ id, ...data, sku })
+      .values({
+        id,
+        name: data.name,
+        sku,
+        designNumber: data.designNumber,
+        colorCategory: data.colorCategory,
+        imageUrl: data.imageUrl,
+        metersPerPiece: data.metersPerPiece,
+        size: data.size,
+        rate: data.rate,
+      })
       .returning();
+
     return NextResponse.json(product, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) {
